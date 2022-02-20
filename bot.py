@@ -826,15 +826,16 @@ async def rap(ctx, toon=None):
     elapsed = current_time - datetime.datetime.fromtimestamp(mtime)
     elapsed = chop_microseconds(elapsed)
 
-    if elapsed < datetime.timedelta(hours=1):
-        RAP_age = f"RAP retrieved {str((elapsed))} ago."
+    if elapsed < datetime.timedelta(minutes = 5):
+        RAP_age = f"RAP synced {str((elapsed))} ago."
 
-    elif elapsed >= datetime.timedelta(hours=1):
-        await ctx.reply("RAP file is stale... attempting to update.")
+    elif elapsed >= datetime.timedelta(minutes = 5):
         subprocess.call(['sh', './aegis_readme.sh'])
+        st = os.stat('rap.html')
+        mtime = st.st_mtime
         elapsed = current_time - datetime.datetime.fromtimestamp(mtime)
         elapsed = chop_microseconds(elapsed)
-        RAP_age = f"RAP retrieved {str((elapsed))} ago."
+        RAP_age = f"RAP synced {str((elapsed))} ago."
 
     census = pd.read_sql_query('SELECT * FROM census', con)
 
