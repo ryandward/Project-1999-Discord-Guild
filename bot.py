@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Imports
+from sqlalchemy import create_engine
 import config
 import datetime
 import discord
@@ -42,6 +43,9 @@ def has_numbers(inputString):
     return any(char.isdigit() for char in inputString)
 
 
+def chop_microseconds(delta):
+    return delta - datetime.timedelta(microseconds=delta.microseconds)
+
 # now = datetime.now()
 # current_time = now.strftime("%Y:%m:%d:%H:%M:%S")
 
@@ -66,6 +70,7 @@ client = commands.Bot(
     case_insensitive=True,
     intents=intents)
 
+
 def get_player_class(player_class):
     player_class = titlecase(player_class)
     player_class_names = player_classes['Class_name'].to_list()
@@ -77,8 +82,10 @@ def get_player_class(player_class):
 
     else:
         player_class_name = player_class_name[0]
-        player_class = player_classes.loc[player_classes['Class_name'] == player_class_name, 'Class'].item()
+        player_class = player_classes.loc[player_classes['Class_name']
+                                          == player_class_name, 'Class'].item()
         return (player_class)
+
 
 def get_level(level):
     if level < 0 or level > 60:
@@ -88,8 +95,9 @@ def get_level(level):
         return (level)
 
 # Startup Information
-@client.event
 
+
+@client.event
 async def on_ready():
 
     print('Connected to bot:{}'.format(client.user.name))
@@ -153,6 +161,8 @@ async def deduct(ctx, amount: int, name, *, args):
     #     await ctx.reply("Failed to insert Python variable into sqlite table", error)
 
 ########################################################################################################
+
+
 async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -265,7 +275,8 @@ async def promote(ctx, name):
 
     channel = client.get_channel(851549677815070751)  # census chat
     member = await ctx.guild.fetch_member(discord_ID)
-    probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
+    probationary_role = ctx.guild.get_role(
+        884172643702546473)  # come back to this
     member_role = ctx.guild.get_role(870669705646587924)
 
     await member.remove_roles(probationary_role)
@@ -285,28 +296,31 @@ async def assign(ctx, toon, level: int, player_class, user_name):
 @client.command()
 async def main(ctx, toon, level: int = None, player_class: str = None):
 
-	toon = titlecase(toon)
+    toon = titlecase(toon)
 
-	census = pd.read_sql_query('SELECT * FROM census', con)
+    census = pd.read_sql_query('SELECT * FROM census', con)
 
-	toon_discord_ID = census.loc[census["Name"] == toon, "ID"]
+    toon_discord_ID = census.loc[census["Name"] == toon, "ID"]
 
-	if len(toon_discord_ID) > 0:
-		toon_discord_ID = toon_discord_ID.item()
-		toon_mains = census.loc[(census['ID'] == toon_discord_ID) & (census['Status'] == "Main") & (census['Name'] != toon) , 'Name'].to_list()
+    if len(toon_discord_ID) > 0:
+        toon_discord_ID = toon_discord_ID.item()
+        toon_mains = census.loc[(census['ID'] == toon_discord_ID) & (
+            census['Status'] == "Main") & (census['Name'] != toon), 'Name'].to_list()
 
-		for i in toon_mains:
-			await alt(ctx, i)
+        for i in toon_mains:
+            await alt(ctx, i)
 
-	else:
-		user_discord_ID = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
-		user_mains = census.loc[(census['ID'] == user_discord_ID) & (census['Status'] == "Main") & (census['Name'] != toon), 'Name'].to_list()
+    else:
+        user_discord_ID = str(
+            ctx.message.guild.get_member_named(format(ctx.author)).id)
+        user_mains = census.loc[(census['ID'] == user_discord_ID) & (
+            census['Status'] == "Main") & (census['Name'] != toon), 'Name'].to_list()
 
-		for i in user_mains:
-			await alt(ctx, i)
+        for i in user_mains:
+            await alt(ctx, i)
 
-	user_name = format(ctx.author)
-	await declare_toon(ctx, "Main", toon, level, player_class, user_name)
+    user_name = format(ctx.author)
+    await declare_toon(ctx, "Main", toon, level, player_class, user_name)
 
 
 @client.command()
@@ -314,6 +328,7 @@ async def bot(ctx, toon, level: int = None, player_class: str = None):
 
     user_name = format(ctx.author)
     await declare_toon(ctx, "Bot", toon, level, player_class, user_name)
+
 
 @client.command()
 async def alt(ctx, toon, level: int = None, player_class: str = None):
@@ -385,7 +400,6 @@ async def toons(ctx, toon=None):
     alt_toons = toons[toons['Status'] == "Alt"]
     bot_toons = toons[toons['Status'] == "Bot"]
 
-
     toons_list = discord.Embed(
         title=f":book:Census data entry",
         description="DKP can be spent on all toons,\nbut only earned on toons over 45.",
@@ -396,7 +410,7 @@ async def toons(ctx, toon=None):
             name="Main",
             # value=f"{len(main_toons)} character(s) declared as mains",
             value=f"Character declared as main",
-			inline=False)
+            inline=False)
 
         toons_list.add_field(
             name=":bust_in_silhouette: Name",
@@ -411,9 +425,8 @@ async def toons(ctx, toon=None):
         toons_list.add_field(
             name=":arrow_double_up: Level",
             value=main_toons.Level.to_string(
-            index=False),
+                index=False),
             inline=True)
-
 
     if len(alt_toons) > 0:
 
@@ -545,16 +558,14 @@ async def name_to_id(ctx, *, name=None):
         time.sleep(2)
 
 
-
 @client.command()
 @commands.has_role("officer")
 async def logs(ctx, *, args):
 
-    census       = pd.read_sql_query('SELECT * FROM census'      , con)
-    dkp          = pd.read_sql_query('SELECT * FROM dkp'         , con)
-    raids        = pd.read_sql_query('SELECT * FROM raids'       , con)
-    manned_bots  = pd.read_sql_query('SELECT * FROM manned_bots' , con)
-
+    census = pd.read_sql_query('SELECT * FROM census', con)
+    dkp = pd.read_sql_query('SELECT * FROM dkp', con)
+    raids = pd.read_sql_query('SELECT * FROM raids', con)
+    manned_bots = pd.read_sql_query('SELECT * FROM manned_bots', con)
 
     # timestamp
     re1 = '(?<=^\[).*?(?=])'
@@ -596,7 +607,8 @@ async def logs(ctx, *, args):
 
         timestamp = line[0]
 
-        timestamp = datetime.datetime.strptime(timestamp, '%a %b %d %H:%M:%S %Y')
+        timestamp = datetime.datetime.strptime(
+            timestamp, '%a %b %d %H:%M:%S %Y')
 
         timestamp = datetime.datetime.strftime(timestamp, '%Y-%m-%d %H:%M:%S')
 
@@ -632,7 +644,8 @@ async def logs(ctx, *, args):
 
         elif len(level_class) == 3:
             level = level_class[0]
-            player_class = player_classes.loc[player_classes["Class_name"] == f"{level_class[1]} {level_class[2]}", "Class"].item()
+            player_class = player_classes.loc[player_classes["Class_name"]
+                                              == f"{level_class[1]} {level_class[2]}", "Class"].item()
 
         sql_response = "INSERT INTO attendance (Date, Raid, Name, Level, Class, ID) VALUES (?, ?, ?, ?, ?, ?);"
 
@@ -676,37 +689,37 @@ async def welcome(ctx):
     embed.add_field(
         name=":one:",
         value="Declare your mains on the <#851549677815070751> here, on the Ex Astra server. \n Some useful commands include: `!main <character name> <level> <class>`, `!toons`, `!dkp`",
-		inline=False)
+        inline=False)
 
     embed.add_field(
         name=":two:",
-		value="Join the Aegis Alliance Server invite below and introduce yourself here:\n <#465750297336086530> (link will be usable once you join the invite below)",
-		inline=False)
+        value="Join the Aegis Alliance Server invite below and introduce yourself here:\n <#465750297336086530> (link will be usable once you join the invite below)",
+        inline=False)
 
     embed.add_field(
         name=":three:",
         value="Register your toon on [Aegis Website](https://aegisrap.com).\nThis is how you'll be able to keep track of your RAP (Raid Attendance Points) for Aegis Alliance Raids.",
-		inline=False)
+        inline=False)
 
     embed.add_field(
         name=":four:",
         value=" Have a question?\n :man_raising_hand:Write it in the <#864599563204296724> channel!",
-		inline=False)
+        inline=False)
 
     embed.add_field(
         name=":five:",
         value="Need to talk to an officer? Tag an officer using <@&849337092324327454> in the <#838976036167090247> or other text channels.",
-		inline=False)
+        inline=False)
 
     embed.add_field(
         name=":six:",
         value="Check our <#870938136472088586>, <#851872447057100840>, and <#856424309026979870> channels for upcoming events",
-		inline=False)
+        inline=False)
 
     embed.add_field(
         name=":seven:",
         value="Check our <#851834766302249020> channel if you need assistance with your epic",
-		inline=False)
+        inline=False)
 
     await ctx.send(embed=embed)
 
@@ -735,70 +748,145 @@ async def welcome(ctx):
 # 		await ctx.reply(f':question:{toon} not found \nSee aegis webiste.')
 
 
+# @client.command()
+# async def rap(ctx, toon = None):
+#
+# 	census = pd.read_sql_query('SELECT * FROM census', con)
+# 	subprocess.call(['sh', './aegis_readme.sh'])
+# 	rap_totals = pd.read_html('rap.html')
+# 	# print(rap_totals)
+# 	rap_totals = rap_totals[len(rap_totals)-1]
+# 	rap_totals['Name'] = rap_totals['Name'].apply(titlecase)
+# 	aegis_census = pd.read_csv('aegis_census.tsv', sep="\t", header=None, names=['Main', 'Alt'])
+#
+# 	for i in aegis_census['Main'].drop_duplicates():
+# 		aegis_census = aegis_census.append({'Main' : i, 'Alt': i}, ignore_index=True)
+#
+# 	for i in rap_totals['Name'].drop_duplicates():
+# 		aegis_census = aegis_census.append({'Main' : i, 'Alt': i}, ignore_index=True)
+#
+# 	aegis_census = aegis_census.drop_duplicates()
+#
+# 	if toon == None:
+# 		user_name = format(ctx.author)
+# 		discord_id = str(ctx.message.guild.get_member_named(user_name).id)
+#
+# 	if toon != None:
+# 		toon = toon.capitalize()
+# 		user_name = format(toon)
+# 		discord_id = census.loc[census['Name'] == toon, 'ID'].item()
+#
+# 	inner_merged = pd.merge(aegis_census, census, left_on ="Alt", right_on="Name", how="inner")
+# 	inner_merged = inner_merged[["Main", "Alt", "ID"]]
+# 	inner_merged = pd.merge(inner_merged, rap_totals, left_on ="Main", right_on="Name", how="inner")
+# 	inner_merged = inner_merged[[ "ID", "Alt", "Unnamed: 7"]]
+#
+# 	inner_merged.columns = ['ID', 'Name', 'RAP']
+#
+# 	inner_merged = inner_merged.sort_values(by=['Name'])
+#
+# 	rap_totals = inner_merged.loc[inner_merged['ID'] == discord_id]
+#
+# 	rap_list = discord.Embed(
+#         title=f":dragon:RAP for `{user_name}`",
+# 		description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations.\nRAP may be inconsistent between toons.\nInactive players may not be shown until next AEGIS activity.",
+# 		colour=discord.Colour.from_rgb(241, 196, 15))
+#
+# 	rap_list.add_field(
+# 		name="Character Declaration",
+# 		value=f"{len(rap_totals)} linked character(s) with RAP are declared in AEGIS.",
+# 		inline=False)
+#
+# 	if len(rap_totals) > 0:
+#
+# 		rap_list.add_field(
+#     		name=":bust_in_silhouette: Name",
+#     		value=rap_totals.Name.to_string(index=False),
+#     		inline=True)
+#
+# 		rap_list.add_field(
+#             name=":arrow_up:️ Current RAP",
+#     	    value=rap_totals.RAP.to_string(index=False), inline=True)
+#
+# 	rap_list.set_footer(text="Fetched at local time")
+#
+# 	rap_list.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
+#
+# 	await ctx.reply(embed=rap_list)
+
 @client.command()
 async def rap(ctx, toon=None):
 
-	census = pd.read_sql_query('SELECT * FROM census', con)
-	subprocess.call(['sh', '../Aegis/aegis_readme.sh'])
-	rap_totals = pd.read_html('../Aegis/rap.html')
-	rap_totals = rap_totals[15]
-	rap_totals['Name'] = rap_totals['Name'].apply(titlecase)
-	aegis_census = pd.read_csv('../Aegis/aegis_census.tsv', sep="\t", header=None, names=['Main', 'Alt'])
+    import os
+    st = os.stat('rap.html')
+    mtime = st.st_mtime
 
-	for i in aegis_census['Main'].drop_duplicates():
-		aegis_census = aegis_census.append({'Main' : i, 'Alt': i}, ignore_index=True)
+    current_time = datetime.datetime.now()
 
-	for i in rap_totals['Name'].drop_duplicates():
-		aegis_census = aegis_census.append({'Main' : i, 'Alt': i}, ignore_index=True)
+    elapsed = current_time - datetime.datetime.fromtimestamp(mtime)
+    elapsed = chop_microseconds(elapsed)
 
-	aegis_census = aegis_census.drop_duplicates()
+    if elapsed < datetime.timedelta(hours=1):
+        RAP_age = f"RAP retrieved {str((elapsed))} ago."
 
-	if toon == None:
-		user_name = format(ctx.author)
-		discord_id = str(ctx.message.guild.get_member_named(user_name).id)
+    elif elapsed >= datetime.timedelta(hours=1):
+        await ctx.reply("RAP file is stale... attempting to update.")
+        subprocess.call(['sh', './aegis_readme.sh'])
+        elapsed = current_time - datetime.datetime.fromtimestamp(mtime)
+        elapsed = chop_microseconds(elapsed)
+        RAP_age = f"RAP retrieved {str((elapsed))} ago."
 
-	if toon != None:
-		toon = toon.capitalize()
-		user_name = format(toon)
-		discord_id = census.loc[census['Name'] == toon, 'ID'].item()
+    census = pd.read_sql_query('SELECT * FROM census', con)
 
-	inner_merged = pd.merge(aegis_census, census, left_on ="Alt", right_on="Name", how="inner")
-	inner_merged = inner_merged[["Main", "Alt", "ID"]]
-	inner_merged = pd.merge(inner_merged, rap_totals, left_on ="Main", right_on="Name", how="inner")
-	inner_merged = inner_merged[[ "ID", "Alt", "Unnamed: 7"]]
+    rap_totals = pd.read_html('rap.html')
+    rap_totals = rap_totals[len(rap_totals) - 1][['Name', 'Unnamed: 7']]
+    rap_totals['Name'] = rap_totals['Name'].apply(titlecase)
+    rap_totals.columns = ['Name', 'RAP']
 
-	inner_merged.columns = ['ID', 'Name', 'RAP']
+    if toon == None:
+        user_name = format(ctx.author)
+        discord_id = str(ctx.message.guild.get_member_named(user_name).id)
 
-	inner_merged = inner_merged.sort_values(by=['Name'])
+    if toon != None:
+        toon = toon.capitalize()
+        user_name = format(toon)
+        discord_id = census.loc[census['Name'] == toon, 'ID'].item()
 
-	rap_totals = inner_merged.loc[inner_merged['ID'] == discord_id]
+    inner_merged = pd.merge(
+        rap_totals, census, left_on="Name", right_on="Name", how="inner")
 
-	rap_list = discord.Embed(
+    inner_merged = inner_merged[['ID', 'Name', 'RAP']]
+
+    inner_merged = inner_merged.sort_values(by=['Name'])
+
+    rap_totals = inner_merged.loc[inner_merged['ID'] == discord_id]
+
+    rap_list = discord.Embed(
         title=f":dragon:RAP for `{user_name}`",
-		description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations.\nRAP may be inconsistent between toons.\nInactive players may not be shown until next AEGIS activity.",
-		colour=discord.Colour.from_rgb(241, 196, 15))
+        description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations.\nRAP may be inconsistent between toons, depending on\n player discrepancies between Ex Astra and AEGIS.",
+        colour=discord.Colour.from_rgb(241, 196, 15))
 
-	rap_list.add_field(
-		name="Character Declaration",
-		value=f"{len(rap_totals)} linked character(s) with RAP are declared in AEGIS.",
-		inline=False)
+    rap_list.add_field(
+        name="Character Declaration",
+        value=f"{len(rap_totals)} linked character(s) with RAP are declared in AEGIS.",
+        inline=False)
 
-	if len(rap_totals) > 0:
+    if len(rap_totals) > 0:
 
-		rap_list.add_field(
-    		name=":bust_in_silhouette: Name",
-    		value=rap_totals.Name.to_string(index=False),
-    		inline=True)
+        rap_list.add_field(
+            name=":bust_in_silhouette: Name",
+            value=rap_totals.Name.to_string(index=False),
+            inline=True)
 
-		rap_list.add_field(
+        rap_list.add_field(
             name=":arrow_up:️ Current RAP",
-    	    value=rap_totals.RAP.to_string(index=False), inline=True)
+            value=rap_totals.RAP.to_string(index=False), inline=True)
 
-	rap_list.set_footer(text="Fetched at local time")
+    rap_list.set_footer(text=RAP_age)
 
-	rap_list.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
+    # rap_list.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
 
-	await ctx.reply(embed=rap_list)
+    await ctx.reply(embed=rap_list)
 
 
 @client.command()
@@ -816,7 +904,7 @@ async def bank(ctx):
 
     req = Request(attachment.url, headers={'User-Agent': 'Mozilla/5.0'})
     stream = urlopen(req).read()
-    inventory = pd.read_csv(io.StringIO(stream.decode('utf-8')), sep = "\t")
+    inventory = pd.read_csv(io.StringIO(stream.decode('utf-8')), sep="\t")
 
     inventory.insert(0, "Banker", banker_name)
     inventory.insert(0, "Time", current_time)
@@ -830,6 +918,7 @@ async def bank(ctx):
 
     # inventory = inventory.loc[inventory["Count"] > 0]
 
+
 @client.command()
 async def find(ctx, *, name):
 
@@ -837,11 +926,12 @@ async def find(ctx, *, name):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
-    bank = pd.read_sql_table("bank", con = engine)
+    bank = pd.read_sql_table("bank", con=engine)
     bank["Name"] = bank["Name"].apply(titlecase)
     bank["Name"] = bank["Name"].str.replace("`", "'")
 
-    search_results = bank[bank["Name"].str.contains(name)][["Banker", "Name", "Location", "Count", "Time"]]
+    search_results = bank[bank["Name"].str.contains(
+        name)][["Banker", "Name", "Location", "Count", "Time"]]
 
     unique_bankers = search_results["Banker"].unique()
 
@@ -856,23 +946,23 @@ async def find(ctx, *, name):
 
             search_embed = discord.Embed(
                 title=f":gem: Treasury Query for `{name}`",
-            	description=f"Found on `{i}`",
-            	colour=discord.Colour.from_rgb(241, 196, 15))
+                description=f"Found on `{i}`",
+                colour=discord.Colour.from_rgb(241, 196, 15))
 
             search_embed.add_field(
-            	name="Item Characteristics",
-            	value=f"{len(banker_results)} matching item(s) found.",
-            	inline=False)
+                name="Item Characteristics",
+                value=f"{len(banker_results)} matching item(s) found.",
+                inline=False)
 
             search_embed.add_field(
-            	name=":bust_in_silhouette: Item",
-            	value=banker_results.Name.to_string(index=False),
-            	inline=True)
+                name=":bust_in_silhouette: Item",
+                value=banker_results.Name.to_string(index=False),
+                inline=True)
 
             search_embed.add_field(
-            	name=":question: Location",
-            	value=banker_results.Location.to_string(index=False),
-            	inline=True)
+                name=":question: Location",
+                value=banker_results.Location.to_string(index=False),
+                inline=True)
 
             search_embed.add_field(
                 name=":arrow_up:️ Count",
@@ -880,9 +970,11 @@ async def find(ctx, *, name):
 
             search_embed.set_footer(text="Fetched at local time")
 
-            search_embed.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
+            search_embed.timestamp = datetime.datetime.now(
+                pytz.timezone('US/Pacific'))
 
             await ctx.reply(embed=search_embed)
+
 
 @client.command()
 @commands.has_role("treasurer")
@@ -892,10 +984,11 @@ async def banktotals(ctx):
     banktotals_file = "banktotals-" + current_time + ".txt"
 
     engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
-    bank = pd.read_sql_table("bank", con = engine)
-    trash = pd.read_sql_table("trash", con = engine)
+    bank = pd.read_sql_table("bank", con=engine)
+    trash = pd.read_sql_table("trash", con=engine)
 
-    banktotals = bank.merge(trash.drop_duplicates(), on=['Name'], how='left', indicator=True)
+    banktotals = bank.merge(trash.drop_duplicates(), on=[
+                            'Name'], how='left', indicator=True)
     banktotals = banktotals[banktotals['_merge'] == "left_only"]
     banktotals = banktotals.groupby(['Name'])['Count'].sum().to_frame()
 
@@ -910,7 +1003,6 @@ async def banktotals(ctx):
 
     await ctx.reply(f':moneybag:Here is a text file with all the bank totals.', file=discord.File(banktotals_file))
     return
-
 
 
 @client.command()
@@ -928,9 +1020,10 @@ async def who(ctx, level: int = None, player_class: str = None):
 
     engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
 
-    census = pd.read_sql_table("census", con = engine)
+    census = pd.read_sql_table("census", con=engine)
 
-    result = census.loc[(census['Class'] == player_class) & (census['Level'] == level) & (census['Status'] != "Dropped"), ['Name','ID']]
+    result = census.loc[(census['Class'] == player_class) & (
+        census['Level'] == level) & (census['Status'] != "Dropped"), ['Name', 'ID']]
 
     result['ID'] = "<@" + result['ID'] + ">"
 
@@ -946,8 +1039,6 @@ async def who(ctx, level: int = None, player_class: str = None):
 @client.command()
 async def event(ctx):
     return
-
-
 
 
 @client.event
@@ -975,7 +1066,6 @@ async def on_command_error(ctx, error):
 
     raise error
 
-from sqlalchemy import create_engine
 
 # @client.event
 # async def on_command_error(ctx, error):
