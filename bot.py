@@ -826,11 +826,12 @@ async def rap(ctx, toon=None):
     elapsed = current_time - datetime.datetime.fromtimestamp(mtime)
     elapsed = chop_microseconds(elapsed)
 
-    if elapsed < datetime.timedelta(minutes = 5):
+    if elapsed < datetime.timedelta(minutes = 1):
         RAP_age = f"RAP synced {str((elapsed))} ago."
 
-    elif elapsed >= datetime.timedelta(minutes = 5):
+    elif elapsed >= datetime.timedelta(minutes = 1):
         subprocess.call(['sh', './aegis_readme.sh'])
+        current_time = datetime.datetime.now()
         st = os.stat('rap.html')
         mtime = st.st_mtime
         elapsed = current_time - datetime.datetime.fromtimestamp(mtime)
