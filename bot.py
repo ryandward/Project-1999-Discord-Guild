@@ -42,18 +42,12 @@ class CensusError(Exception):
 def has_numbers(inputString):
     return any(char.isdigit() for char in inputString)
 
-
 def chop_microseconds(delta):
     return delta - datetime.timedelta(microseconds=delta.microseconds)
-
-# now = datetime.now()
-# current_time = now.strftime("%Y:%m:%d:%H:%M:%S")
-
 
 con = sqlite3.connect('ex_astra.db')
 con.execute('PRAGMA foreign_keys = ON')
 cur = con.cursor()
-
 
 player_classes = pd.read_sql_query('SELECT * FROM class_definitions', con)
 raids = pd.read_sql_query('SELECT * FROM raids', con)
@@ -63,13 +57,11 @@ DISCORD_TOKEN = token
 intents = discord.Intents.default()
 intents.members = True
 
-
 # Create bot
 client = commands.Bot(
     command_prefix=prefix,
     case_insensitive=True,
     intents=intents)
-
 
 def get_player_class(player_class):
     player_class = titlecase(player_class)
@@ -86,7 +78,6 @@ def get_player_class(player_class):
                                           == player_class_name, 'Class'].item()
         return (player_class)
 
-
 def get_level(level):
     if level < 0 or level > 60:
         raise CensusError("Error")
@@ -95,34 +86,31 @@ def get_level(level):
         return (level)
 
 # Startup Information
-
-
 @client.event
 async def on_ready():
-
     print('Connected to bot:{}'.format(client.user.name))
 
     print('Bot ID:{}'.format(client.user.id))
 
-
 @client.command()
 async def ping(ctx):
     pingtime = time.time()
+
     pingms = await ctx.reply("Pinging...")
+
     ping = time.time() - pingtime
 
     await ctx.reply(":ping_pong: time is `%.01f seconds`" % ping)
 
-
 @client.command()
 @commands.has_role("lootmaster")
 async def deduct(ctx, amount: int, name, *, args):
+    census = pd.read_sql_query('SELECT * FROM census', con)
+    dkp = pd.read_sql_query('SELECT * FROM dkp', con)
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     name = titlecase(name)
-    census = pd.read_sql_query('SELECT * FROM census', con)
-    dkp = pd.read_sql_query('SELECT * FROM dkp', con)
 
     if len(census.loc[census["Name"] == name, "ID"]) == 0:
         await ctx.reply(f":exclamation:No character named `{name}` was found.")
@@ -130,8 +118,11 @@ async def deduct(ctx, amount: int, name, *, args):
         return
 
     discord_ID = census.loc[census["Name"] == name, "ID"].item()
+
     earned_dkp = dkp.loc[dkp["ID"] == discord_ID, "Earned_DKP"].item()
+
     spent_dkp = dkp.loc[dkp["ID"] == discord_ID, "Spent_DKP"].item()
+
     current_dkp = earned_dkp - spent_dkp
 
     if current_dkp >= amount:
@@ -144,95 +135,108 @@ async def deduct(ctx, amount: int, name, *, args):
 
             if cur.rowcount == 1:
                 con.commit()
+
                 await ctx.reply(f":white_check_mark:<@{discord_ID}> spent `{amount}` DKP on `{titlecase(args)}` for `{name.capitalize()}`!")
 
             else:
                 con.rollback()
+
                 await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error -2`")
 
         else:
             con.rollback()
+
             await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error -1`")
 
     else:
         await ctx.reply(f":exclamation:`{amount}` is greater than `{name.capitalize()}`'s current total of `{current_dkp}` DKP\nNo action taken")
 
-    # except sqlite3.Error as error:
-    #     await ctx.reply("Failed to insert Python variable into sqlite table", error)
-
 ########################################################################################################
-
-
 async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None):
-
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
     census = pd.read_sql_query('SELECT * FROM census', con)
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     discord_id = ctx.message.guild.get_member_named(user_name).id
 
     if player_class is not None:
         player_class = get_player_class(player_class)
 
     cur.execute('SELECT * FROM census WHERE Name == ?;', (toon.capitalize(),))
+
     col_names = list(map(lambda x: x[0], cur.description))
+
     rows = cur.fetchall()
 
     cur.execute('SELECT * FROM dkp WHERE ID == ?;', (discord_id,))
+
     col_names = list(map(lambda x: x[0], cur.description))
+
     discord_exists = cur.fetchall()
 
     # if the discord account was not found
     if len(discord_exists) == 0:
 
         discord_id = ctx.message.guild.get_member_named(user_name).id
+
         cur.execute('INSERT INTO dkp (Discord, Earned_DKP, Spent_DKP, Date_Joined, ID) VALUES (?, 5, 0, ?, ?);',
                     (user_name, current_time, discord_id))
 
         if cur.rowcount == 1:
             con.commit()
+
             channel = client.get_channel(884164383498965042)
+
             member = ctx.message.guild.get_member_named(user_name)
 
-            # await ctx.reply(member)
-
             role = ctx.guild.get_role(884172643702546473)  # come back to this
+
             await member.add_roles(role)
 
             formatted_id = f'<@{discord_id}>'
-            # await channel.send(f"<@&849337092324327454>` {toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.") # Whatever msg u want to put
-            # Whatever msg u want to put
+
             await channel.send(f"<@&849337092324327454> `{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
 
         else:
             con.rollback()
+
             await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 0`")
 
     # if the character was found
     if len(rows) == 1:
 
         if level is None:
+
             cur.execute('UPDATE Census SET Status = ?, Time = ? WHERE Name = ?;',
                         (status.capitalize(), current_time, toon.capitalize()))
 
             if cur.rowcount == 1:
+
                 con.commit()
+
                 await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}`")
 
             else:
+
                 con.rollback()
+
                 await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 1`")
 
         if level is not None:
+
             if player_class is None:
+
                 cur.execute('UPDATE Census SET Status = ?, Level = ?, Time = ? WHERE Name = ?;',
                             (status.capitalize(), level, current_time, toon.capitalize()))
 
                 if cur.rowcount == 1:
+
                     con.commit()
+
                     await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}` and level `{level}`")
 
                 else:
+
                     con.rollback()
+
                     await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 2`")
 
             if player_class is not None:
@@ -241,22 +245,31 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
                             (status.capitalize(), level, player_class, current_time, toon.capitalize()))
 
                 if cur.rowcount == 1:
+
                     con.commit()
+
                     await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now a level `{level}` `{player_class}` `{status}`")
 
                 else:
                     con.rollback()
+
                     await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 3`")
 
     if len(rows) == 0:
+
         if player_class is None or level is None:
+
             await ctx.reply(f":question:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
 
         else:
+
             cur.execute('INSERT INTO census (Name, Level, Class, ID, Status, Time) VALUES (?, ?, ?, ?, ?, ?);',
                         (toon.capitalize(), level, player_class, discord_id, status.capitalize(), current_time))
+
             if cur.rowcount == 1:
+
                 con.commit()
+
                 await ctx.reply(f":white_check_mark:`{toon.capitalize()}` was created and is now a level `{level}` `{player_class}` `{status}`")
 
             else:
@@ -613,7 +626,9 @@ async def logs(ctx, *, args):
         timestamp = datetime.datetime.strftime(timestamp, '%Y-%m-%d %H:%M:%S')
 
         level_class = line[1].split(" ")
+
         name = line[2]
+
         # guild = line[3]
 
         discord_ID = census.loc[census["Name"] == name, "ID"]
@@ -723,97 +738,6 @@ async def welcome(ctx):
 
     await ctx.send(embed=embed)
 
-
-# @client.command()
-# async def rap(ctx, toon=None):
-#
-# 	toon = titlecase(toon)
-#
-# 	rap_totals = pd.read_html('../Aegis/rap.html')
-# 	rap_totals = rap_totals[15]
-# 	rap_totals['Name'] = rap_totals['Name'].apply(titlecase)
-#
-# 	aegis_census = pd.read_csv('../Aegis/aegis_census.tsv', sep = "\t", header = None, names=['Main', 'Alt'])
-# 	aegis_census['Main'] = aegis_census['Main'].apply(titlecase)
-# 	aegis_census['Alt'] = aegis_census['Alt'].apply(titlecase)
-#
-# 	if len(aegis_census.loc[aegis_census['Alt']==toon]) > 0:
-# 		toon = aegis_census.loc[aegis_census["Alt"]==toon, "Main"].drop_duplicates().item()
-# 		toon = titlecase(toon)
-#
-# 	if len(rap_totals.loc[rap_totals['Name']==toon]) > 0:
-# 		await ctx.reply(rap_totals.loc[rap_totals['Name']==toon, 'Unnamed: 7'].item())
-#
-# 	else:
-# 		await ctx.reply(f':question:{toon} not found \nSee aegis webiste.')
-
-
-# @client.command()
-# async def rap(ctx, toon = None):
-#
-# 	census = pd.read_sql_query('SELECT * FROM census', con)
-# 	subprocess.call(['sh', './aegis_readme.sh'])
-# 	rap_totals = pd.read_html('rap.html')
-# 	# print(rap_totals)
-# 	rap_totals = rap_totals[len(rap_totals)-1]
-# 	rap_totals['Name'] = rap_totals['Name'].apply(titlecase)
-# 	aegis_census = pd.read_csv('aegis_census.tsv', sep="\t", header=None, names=['Main', 'Alt'])
-#
-# 	for i in aegis_census['Main'].drop_duplicates():
-# 		aegis_census = aegis_census.append({'Main' : i, 'Alt': i}, ignore_index=True)
-#
-# 	for i in rap_totals['Name'].drop_duplicates():
-# 		aegis_census = aegis_census.append({'Main' : i, 'Alt': i}, ignore_index=True)
-#
-# 	aegis_census = aegis_census.drop_duplicates()
-#
-# 	if toon == None:
-# 		user_name = format(ctx.author)
-# 		discord_id = str(ctx.message.guild.get_member_named(user_name).id)
-#
-# 	if toon != None:
-# 		toon = toon.capitalize()
-# 		user_name = format(toon)
-# 		discord_id = census.loc[census['Name'] == toon, 'ID'].item()
-#
-# 	inner_merged = pd.merge(aegis_census, census, left_on ="Alt", right_on="Name", how="inner")
-# 	inner_merged = inner_merged[["Main", "Alt", "ID"]]
-# 	inner_merged = pd.merge(inner_merged, rap_totals, left_on ="Main", right_on="Name", how="inner")
-# 	inner_merged = inner_merged[[ "ID", "Alt", "Unnamed: 7"]]
-#
-# 	inner_merged.columns = ['ID', 'Name', 'RAP']
-#
-# 	inner_merged = inner_merged.sort_values(by=['Name'])
-#
-# 	rap_totals = inner_merged.loc[inner_merged['ID'] == discord_id]
-#
-# 	rap_list = discord.Embed(
-#         title=f":dragon:RAP for `{user_name}`",
-# 		description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations.\nRAP may be inconsistent between toons.\nInactive players may not be shown until next AEGIS activity.",
-# 		colour=discord.Colour.from_rgb(241, 196, 15))
-#
-# 	rap_list.add_field(
-# 		name="Character Declaration",
-# 		value=f"{len(rap_totals)} linked character(s) with RAP are declared in AEGIS.",
-# 		inline=False)
-#
-# 	if len(rap_totals) > 0:
-#
-# 		rap_list.add_field(
-#     		name=":bust_in_silhouette: Name",
-#     		value=rap_totals.Name.to_string(index=False),
-#     		inline=True)
-#
-# 		rap_list.add_field(
-#             name=":arrow_up:️ Current RAP",
-#     	    value=rap_totals.RAP.to_string(index=False), inline=True)
-#
-# 	rap_list.set_footer(text="Fetched at local time")
-#
-# 	rap_list.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
-#
-# 	await ctx.reply(embed=rap_list)
-
 @client.command()
 async def rap(ctx, toon=None):
 
@@ -886,8 +810,6 @@ async def rap(ctx, toon=None):
 
     rap_list.set_footer(text=RAP_age)
 
-    # rap_list.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
-
     await ctx.reply(embed=rap_list)
 
 
@@ -909,6 +831,7 @@ async def bank(ctx):
     inventory = pd.read_csv(io.StringIO(stream.decode('utf-8')), sep="\t")
 
     inventory.insert(0, "Banker", banker_name)
+
     inventory.insert(0, "Time", current_time)
 
     sql_response = "DELETE FROM bank WHERE Banker == ?"
@@ -918,8 +841,6 @@ async def bank(ctx):
 
     inventory.to_sql("bank", engine, if_exists="append", index=False)
 
-    # inventory = inventory.loc[inventory["Count"] > 0]
-
 
 @client.command()
 async def find(ctx, *, name):
@@ -927,9 +848,14 @@ async def find(ctx, *, name):
     name = titlecase(name)
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
     engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
     bank = pd.read_sql_table("bank", con=engine)
+    trash = pd.read_sql_table("trash", con=engine)
+    bank = bank[~bank['Name'].isin(trash['Name'])]
+
     bank["Name"] = bank["Name"].apply(titlecase)
+
     bank["Name"] = bank["Name"].str.replace("`", "'")
 
     search_results = bank[bank["Name"].str.contains(
@@ -982,26 +908,23 @@ async def find(ctx, *, name):
 @commands.has_role("treasurer")
 async def banktotals(ctx):
 
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    banktotals_file = "banktotals-" + current_time + ".txt"
-
     engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
     bank = pd.read_sql_table("bank", con=engine)
     trash = pd.read_sql_table("trash", con=engine)
+    bank = bank[~bank['Name'].isin(trash['Name'])]
 
-    banktotals = bank.merge(trash.drop_duplicates(), on=[
-                            'Name'], how='left', indicator=True)
-    banktotals = banktotals[banktotals['_merge'] == "left_only"]
-    banktotals = banktotals.groupby(['Name'])['Count'].sum().to_frame()
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+    banktotals_file = "banktotals-" + current_time + ".txt"
+
+
+    banktotals = bank.groupby(['Name'])['Count'].sum().to_frame()
 
     banktotals = tabulate(banktotals, headers="keys", tablefmt="psql")
 
     f = open(banktotals_file, "w")
     f.write(banktotals)
     f.close()
-
-    # banktotals_file = "banktotals-" + current_time + ".txt"
-    # banktotals.to_csv(banktotals_file, sep='\t')
 
     await ctx.reply(f':moneybag:Here is a text file with all the bank totals.', file=discord.File(banktotals_file))
     return
@@ -1067,20 +990,5 @@ async def on_command_error(ctx, error):
         return
 
     raise error
-
-
-# @client.event
-# async def on_command_error(ctx, error):
-#  if isinstance(error, commands.NoPrivateMessage):
-#   await ctx.author.send(f'This command must be used in a public channel.')
-#  elif isinstance(error, commands.DisabledCommand):
-#   await ctx.author.send(f'Sorry. This command is disabled and cannot be used.')
-#  elif isinstance(error, commands.CheckFailure):
-#   await ctx.author.send(f'Sorry. You dont have permission to use this command.')
-#  # elif isinstance(error, commands.MissingRequiredArgument):
-#  #  command = ctx.message.content.split()[1]
-#  #  await ctx.author.send(ctx.message.channel, f"Missing an argument: {command}")
-#  elif isinstance(error, commands.CommandNotFound):
-#   await ctx.author.send(f"I don't know that command")
 
 client.run(DISCORD_TOKEN)
