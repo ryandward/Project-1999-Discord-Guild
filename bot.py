@@ -201,6 +201,9 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
             await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 0`")
 
     # if the character was found
+    if len(rows) > 1:
+        await ctx.reply("This is a shared character. Demographics cannot be changed currently.")
+
     if len(rows) == 1:
 
         if level is None:
@@ -393,22 +396,20 @@ async def level(ctx, toon, level):
 
 @client.command()
 async def toons(ctx, toon=None):
-    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
-    if toon == None:
-        cur.execute('SELECT * FROM CENSUS WHERE ID = ?;',
-                    (discord_id,))
 
-        user = discord_id
+    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+    engine     = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    dkp        = pd.read_sql_table("dkp", con=engine)
+    census     = pd.read_sql_table("census", con=engine)
+
+    if toon == None:
+        toons    = census.loc[census["ID"] == str(discord_id)]
 
     else:
-        cur.execute('SELECT * FROM CENSUS WHERE ID = (SELECT ID FROM CENSUS WHERE Name = ?);',
-                    (toon.capitalize(),))
+        toon_ids = census.loc[census["Name"] == toon.capitalize()]
+        toons    = census.loc[census["ID"].isin((toon_ids['ID']))]
 
-        user = toon.capitalize()
-
-    col_names = list(map(lambda x: x[0], cur.description))
-    rows = cur.fetchall()
-    toons = pd.DataFrame(rows, columns=col_names)
+    col_names = toons.columns
     main_toons = toons[toons['Status'] == "Main"]
     alt_toons = toons[toons['Status'] == "Alt"]
     bot_toons = toons[toons['Status'] == "Bot"]
@@ -916,7 +917,6 @@ async def banktotals(ctx):
     current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
     banktotals_file = "banktotals-" + current_time + ".txt"
-
 
     banktotals = bank.groupby(['Name'])['Count'].sum().to_frame()
 
