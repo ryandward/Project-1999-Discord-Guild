@@ -968,22 +968,14 @@ async def claim(ctx, toon):
     discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
 
     Base = automap_base()
-
     engine = create_engine('sqlite:///ex_astra.db')
-
     Base.prepare(engine, reflect=True)
-
     Census = Base.classes.census
-
     session = Session(engine)
 
     claimed_toon = session.query(Census).filter(Census.Name == toon).one()
 
     old_owner = claimed_toon.ID
-
-    old_main = session.query(Census).filter(Census.ID == old_owner).filter(Census.Status == "Main").one()
-
-    old_main = old_main.Name
 
     if claimed_toon.Status == "Bot":
 
@@ -992,10 +984,6 @@ async def claim(ctx, toon):
         claimed_toon.Time = current_time
 
         session.commit()
-
-        new_main = session.query(Census).filter(Census.ID == discord_id).filter(Census.Status == "Main").one()
-
-        new_main = new_main.Name
 
         await ctx.reply(f":white_check_mark:<@{discord_id}> has taken control of `{toon}` from <@{old_owner}>." )
 
