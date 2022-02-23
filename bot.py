@@ -17,6 +17,9 @@ import sqlite3
 import sqlalchemy
 import subprocess
 
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
 from config import token, prefix, ownerid
 from difflib import get_close_matches as gcm
 from discord.ext import commands
@@ -201,8 +204,8 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
             await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 0`")
 
     # if the character was found
-    if len(rows) > 1:
-        await ctx.reply("This is a shared character. Demographics cannot be changed currently.")
+    # if len(rows) > 1:
+    #     await ctx.reply("This is a shared character. Demographics cannot be changed currently.")
 
     if len(rows) == 1:
 
@@ -376,7 +379,6 @@ async def level(ctx, toon, level):
 
     if (has_numbers(toon) == True) or (has_numbers(level) == False):
         await ctx.reply(f"Try `!level <toon> <level>`. Also make sure {toon} has been registered with `!main` or `!alt`.")
-        raise error
         return
 
     cur.execute('UPDATE Census SET Level = ?, Time = ? WHERE Name = ?;',
@@ -397,22 +399,22 @@ async def level(ctx, toon, level):
 @client.command()
 async def toons(ctx, toon=None):
 
-    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
     engine     = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
     dkp        = pd.read_sql_table("dkp", con=engine)
     census     = pd.read_sql_table("census", con=engine)
 
     if toon == None:
-        toons    = census.loc[census["ID"] == str(discord_id)]
+        toons = census.loc[census["ID"] == str(discord_id)]
 
     else:
         toon_ids = census.loc[census["Name"] == toon.capitalize()]
         toons    = census.loc[census["ID"].isin((toon_ids['ID']))]
 
-    col_names = toons.columns
+    col_names  = toons.columns
     main_toons = toons[toons['Status'] == "Main"]
-    alt_toons = toons[toons['Status'] == "Alt"]
-    bot_toons = toons[toons['Status'] == "Bot"]
+    alt_toons  = toons[toons['Status'] == "Alt"]
+    bot_toons  = toons[toons['Status'] == "Bot"]
 
     toons_list = discord.Embed(
         title=f":book:Census data entry",
@@ -491,48 +493,48 @@ async def toons(ctx, toon=None):
 
 @client.command()
 async def dkp(ctx, toon=None):
-    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+
+    engine     = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    discord_id = format(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    dkp        = pd.read_sql_table("dkp", con=engine)
+    census     = pd.read_sql_table("census", con=engine)
 
     if toon == None:
-        # cur.execute('SELECT DISTINCT Earned_DKP, Spent_DKP FROM DKP LEFT JOIN census ON dkp.Discord = census.Discord WHERE census.Status = "Main" AND census.Level > 45 AND dkp.Discord = ?;', (format(ctx.author),))
-        cur.execute(
-            'SELECT DISTINCT Earned_DKP, Spent_DKP FROM DKP LEFT JOIN census ON dkp.ID = census.ID WHERE dkp.ID = ?;', (discord_id,))
-
         user = format(ctx.author)
 
-    else:
-        # cur.execute('SELECT DISTINCT Earned_DKP, Spent_DKP FROM DKP LEFT JOIN census ON dkp.Discord = census.Discord WHERE census.Status = "Main" AND census.Level > 45 AND census.Name = ?;', (toon.capitalize(),))
-        cur.execute(
-            'SELECT DISTINCT Earned_DKP, Spent_DKP FROM DKP LEFT JOIN census ON dkp.ID = census.ID WHERE census.Name = ?;', (toon.capitalize(),))
+        dkp_mains = census[('Main' == census.Status) & (census.ID.isin(census[census.ID == discord_id]['ID']))][['ID', 'Name']]
 
+    else:
         user = toon.capitalize()
 
-    col_names = list(map(lambda x: x[0], cur.description))
-    rows = cur.fetchone()
+        dkp_mains = census[('Main' == census.Status) & (census.ID.isin(census[census.Name == toon.capitalize()]['ID']))][['ID', 'Name']]
 
-    if rows is not None:
+    dkp_dict = dkp.merge(dkp_mains, how = 'inner', on = 'ID')
 
-        dkp_list = zip(col_names, rows)
-        dkp_dict = dict(dkp_list)
+    dkp_dict["Current_DKP"] = dkp_dict["Earned_DKP"] - dkp_dict["Spent_DKP"]
+
+    rows = len(dkp_dict)
+
+    if rows == 1:
 
         embed = discord.Embed(
             title=f":dragon:DKP for `{user}`",
-            description="DKP can be spent on all toons,\nbut only earned on toons over 45.",
+            description="DKP can be spent on all toons, but only earned on toons over 45.",
             colour=discord.Colour.from_rgb(241, 196, 15))
 
         embed.add_field(
+            name=":bust_in_silhouette:️ Main Toon",
+            value=dkp_dict["Name"].to_string(index=False),
+            inline=True)
+
+        embed.add_field(
             name=":arrow_up:️ Current DKP",
-            value=dkp_dict["Earned_DKP"] - dkp_dict["Spent_DKP"],
+            value=dkp_dict["Current_DKP"].to_string(index=False),
             inline=True)
 
         embed.add_field(
             name=":moneybag: Total Earned",
-            value=dkp_dict["Earned_DKP"],
-            inline=True)
-
-        embed.add_field(
-            name=":money_with_wings: Total Spent",
-            value=dkp_dict["Spent_DKP"],
+            value=dkp_dict["Earned_DKP"].to_string(index=False),
             inline=True)
 
         embed.set_footer(
@@ -544,32 +546,11 @@ async def dkp(ctx, toon=None):
 
     else:
         # await ctx.reply(f":question:{format(ctx.author.mention)}, No DKP found for `{user}`. Ensure the character is created and over level 45. \nSee `!help toons`, `!help main`, and `!help level`")
-        await ctx.reply(f":question:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
+        await ctx.reply(f":question:No census entry was not found. Check `!toons` and ensure one toon is declared as main, using `!main`.")
 
 
-@client.command(pass_context=True)
-@commands.has_role("officer")
-async def name_to_id(ctx, *, name=None):
 
-    cur.execute('SELECT Discord FROM dkp WHERE ID IS NULL;')
 
-    col_names = list(map(lambda x: x[0], cur.description))
-
-    rows = cur.fetchall()
-
-    accounts = pd.DataFrame(rows, columns=col_names)
-
-    for row in accounts.iterrows():
-
-        name = row[1][0]
-
-        if ctx.message.guild.get_member_named(name) is not None:
-
-            user_id = ctx.message.guild.get_member_named(name).id
-
-            await ctx.reply(f"UPDATE dkp SET ID = {user_id} WHERE Discord == '{name}';")
-
-        time.sleep(2)
 
 
 @client.command()
@@ -602,7 +583,6 @@ async def logs(ctx, *, args):
 
     else:
         await ctx.reply(f"`{raid}` entry not found.\nAsk Rahmani")
-        raise error
         return
 
     # create empty lists of rejected players and seen players to prevent double counting
@@ -959,6 +939,67 @@ async def who(ctx, level: int = None, player_class: str = None):
     await ctx.reply(result)
 
     return
+
+# @client.command()
+# async def claim(ctx):
+#     import sqlalchemy as db
+#
+#     engine = db.create_engine('sqlite:///ex_astra.db')
+#     connection = engine.connect()
+#     metadata = db.MetaData()
+#     census = db.Table('census', metadata, autoload=True, autoload_with=engine)
+#
+#     query = db.update(census).values(ID = 816198379344232488).where(census.columns.Name == "Test")
+#     results = connection.execute(query)
+#
+#     query = db.select(census.ID).where(census.columns.Name == 'Test').where(census.columns.ID == 816198379344232488)
+#     results = connection.execute(query).fetchall()
+#
+#     await ctx.reply(results)
+
+@client.command()
+async def claim(ctx, toon):
+    from sqlalchemy.ext.automap import automap_base
+    from sqlalchemy.orm import Session
+    from sqlalchemy import create_engine
+
+    toon = toon.capitalize()
+    
+    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+
+    Base = automap_base()
+
+    engine = create_engine('sqlite:///ex_astra.db')
+
+    Base.prepare(engine, reflect=True)
+
+    Census = Base.classes.census
+
+    session = Session(engine)
+
+    claimed_toon = session.query(Census).filter(Census.Name == toon).one()
+
+    old_owner = claimed_toon.ID
+
+    old_main = session.query(Census).filter(Census.ID == old_owner).filter(Census.Status == "Main").one()
+
+    old_main = old_main.Name
+
+    if claimed_toon.Status == "Bot":
+
+        claimed_toon.ID = discord_id
+
+        session.commit()
+
+        new_main = session.query(Census).filter(Census.ID == discord_id).filter(Census.Status == "Main").one()
+
+        new_main = new_main.Name
+
+        await ctx.reply(f":white_check_mark:`{new_main}` has taken control of `{toon}` from `{old_main}`." )
+
+    if claimed_toon.Status != "Bot":
+
+        await ctx.reply(f":exclamation:`{toon}` can only change ownership if `{old_main}` declares the toon as a `!bot`." )
 
 
 @client.command()
