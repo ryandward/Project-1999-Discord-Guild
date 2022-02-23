@@ -1,0 +1,10 @@
+#!/usr/local/bin/bash
+scripts_dir=$(dirname $(realpath $0))
+
+echo "Creating environment in .env"
+python3 -m venv .env
+echo "Using python environment found in .env"
+source .env/bin/activate
+
+echo "Upgrading pip, setuptools, wheel"
+python3 -m pip install --upgrade pip setuptools wheel
