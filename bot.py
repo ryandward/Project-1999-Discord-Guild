@@ -964,7 +964,7 @@ async def claim(ctx, toon):
     from sqlalchemy import create_engine
 
     toon = toon.capitalize()
-    
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
 
     Base = automap_base()
@@ -989,17 +989,19 @@ async def claim(ctx, toon):
 
         claimed_toon.ID = discord_id
 
+        claimed_toon.Time = current_time
+
         session.commit()
 
         new_main = session.query(Census).filter(Census.ID == discord_id).filter(Census.Status == "Main").one()
 
         new_main = new_main.Name
 
-        await ctx.reply(f":white_check_mark:`{new_main}` has taken control of `{toon}` from `{old_main}`." )
+        await ctx.reply(f":white_check_mark:<@{discord_id}> has taken control of `{toon}` from <@{old_owner}>." )
 
     if claimed_toon.Status != "Bot":
 
-        await ctx.reply(f":exclamation:`{toon}` can only change ownership if `{old_main}` declares the toon as a `!bot`." )
+        await ctx.reply(f":exclamation:`{toon}` can only change ownership if <@{old_owner}> declares the toon as a `!bot`." )
 
 
 @client.command()
