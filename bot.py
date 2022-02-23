@@ -20,7 +20,7 @@ import subprocess
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from config import token, prefix, ownerid
+from config import token, prefix
 from difflib import get_close_matches as gcm
 from discord.ext import commands
 from discord.ext.commands import Bot
