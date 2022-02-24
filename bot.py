@@ -17,6 +17,8 @@ import sqlite3
 import sqlalchemy
 import subprocess
 
+from sqlalchemy.ext.automap import automap_base
+from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -911,6 +913,12 @@ async def banktotals(ctx):
 # @commands.has_role("treasurer")
 async def who(ctx, level: int = None, player_class: str = None):
 
+    Base = automap_base()
+    engine = create_engine(config.db_url)
+    Base.prepare(engine, reflect=True)
+    Census = Base.classes.census
+    session = Session(engine)
+
     if (level == None or level < 1 or level > 60):
         await ctx.reply("You think you're funny, huh?")
         return
@@ -920,45 +928,37 @@ async def who(ctx, level: int = None, player_class: str = None):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-    engine = sqlalchemy.create_engine(config.db_url, echo=False)
+    query = session.query(Census).\
+        filter(Census.Class == player_class).\
+        filter(Census.Level == level).\
+        filter(Census.Status != "Dropped").\
+        order_by(Census.Time.desc())
 
-    census = pd.read_sql_table("census", con=engine)
+    matching_toons = pd.read_sql(query.statement, query.session.bind)
 
-    result = census.loc[(census['Class'] == player_class) & (
-        census['Level'] == level) & (census['Status'] != "Dropped"), ['Name', 'ID']]
+    matching_toons = matching_toons[['Name', 'Time', 'ID']]
 
-    result['ID'] = "<@" + result['ID'] + ">"
+    matching_toons['Name'] = "`" + matching_toons['Name']
 
-    result = result.to_csv(index=False, header=False, sep='\t')
+    matching_toons['ID'] = "`<@" + matching_toons['ID'] + ">"
+
+    matching_toons = tabulate(matching_toons, headers="keys", showindex=False, tablefmt="plain")
+
+    # matching_toons = string1.split('\n')
+
+
+    matching_toons = re.sub ("^(Name.*)", r"`\1`", matching_toons)
+    matching_toons = re.sub ("^ ", r"?", matching_toons)
+
 
     await ctx.reply(f"Here are registered {level} {player_class}s.")
 
-    await ctx.reply(result)
+    await ctx.reply(matching_toons)
 
     return
 
-# @client.command()
-# async def claim(ctx):
-#     import sqlalchemy as db
-#
-#     engine = db.create_engine(config.db_url)
-#     connection = engine.connect()
-#     metadata = db.MetaData()
-#     census = db.Table('census', metadata, autoload=True, autoload_with=engine)
-#
-#     query = db.update(census).values(ID = 816198379344232488).where(census.columns.Name == "Test")
-#     results = connection.execute(query)
-#
-#     query = db.select(census.ID).where(census.columns.Name == 'Test').where(census.columns.ID == 816198379344232488)
-#     results = connection.execute(query).fetchall()
-#
-#     await ctx.reply(results)
-
 @client.command()
 async def claim(ctx, toon):
-    from sqlalchemy.ext.automap import automap_base
-    from sqlalchemy.orm import Session
-    from sqlalchemy import create_engine
 
     toon = toon.capitalize()
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
