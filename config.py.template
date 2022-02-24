@@ -1,0 +1,4 @@
+
+token = '' # Put the discord bot's token here
+prefix = '!' # Bot command prefix to listen for
+db_url = 'sqlite:///ex_astra.db' # Connection string for the db

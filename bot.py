@@ -20,7 +20,6 @@ import subprocess
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from config import token, prefix, ownerid
 from difflib import get_close_matches as gcm
 from discord.ext import commands
 from discord.ext.commands import Bot
@@ -55,14 +54,12 @@ cur = con.cursor()
 player_classes = pd.read_sql_query('SELECT * FROM class_definitions', con)
 raids = pd.read_sql_query('SELECT * FROM raids', con)
 
-DISCORD_TOKEN = token
-
 intents = discord.Intents.default()
 intents.members = True
 
 # Create bot
 client = commands.Bot(
-    command_prefix=prefix,
+    command_prefix=config.prefix,
     case_insensitive=True,
     intents=intents)
 
@@ -399,7 +396,7 @@ async def level(ctx, toon, level):
 @client.command()
 async def toons(ctx, toon=None):
 
-    engine     = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    engine     = sqlalchemy.create_engine(config.db_url, echo=False)
     discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
     dkp        = pd.read_sql_table("dkp", con=engine)
     census     = pd.read_sql_table("census", con=engine)
@@ -494,7 +491,7 @@ async def toons(ctx, toon=None):
 @client.command()
 async def dkp(ctx, toon=None):
 
-    engine     = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    engine     = sqlalchemy.create_engine(config.db_url, echo=False)
     discord_id = format(ctx.message.guild.get_member_named(format(ctx.author)).id)
     dkp        = pd.read_sql_table("dkp", con=engine)
     census     = pd.read_sql_table("census", con=engine)
@@ -799,7 +796,7 @@ async def rap(ctx, toon=None):
 async def bank(ctx):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    engine = sqlalchemy.create_engine(config.db_url, echo=False)
 
     attachment = ctx.message.attachments[0]
     banker_name = Path(attachment.url).stem.split("-")[0]
@@ -830,7 +827,7 @@ async def find(ctx, *, name):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    engine = sqlalchemy.create_engine(config.db_url, echo=False)
     bank = pd.read_sql_table("bank", con=engine)
     trash = pd.read_sql_table("trash", con=engine)
     bank = bank[~bank['Name'].isin(trash['Name'])]
@@ -889,7 +886,7 @@ async def find(ctx, *, name):
 @commands.has_role("treasurer")
 async def banktotals(ctx):
 
-    engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    engine = sqlalchemy.create_engine(config.db_url, echo=False)
     bank = pd.read_sql_table("bank", con=engine)
     trash = pd.read_sql_table("trash", con=engine)
     bank = bank[~bank['Name'].isin(trash['Name'])]
@@ -923,7 +920,7 @@ async def who(ctx, level: int = None, player_class: str = None):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-    engine = sqlalchemy.create_engine('sqlite:///ex_astra.db', echo=False)
+    engine = sqlalchemy.create_engine(config.db_url, echo=False)
 
     census = pd.read_sql_table("census", con=engine)
 
@@ -944,7 +941,7 @@ async def who(ctx, level: int = None, player_class: str = None):
 # async def claim(ctx):
 #     import sqlalchemy as db
 #
-#     engine = db.create_engine('sqlite:///ex_astra.db')
+#     engine = db.create_engine(config.db_url)
 #     connection = engine.connect()
 #     metadata = db.MetaData()
 #     census = db.Table('census', metadata, autoload=True, autoload_with=engine)
@@ -968,7 +965,7 @@ async def claim(ctx, toon):
     discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
 
     Base = automap_base()
-    engine = create_engine('sqlite:///ex_astra.db')
+    engine = create_engine(config.db_url)
     Base.prepare(engine, reflect=True)
     Census = Base.classes.census
     session = Session(engine)
@@ -1022,4 +1019,4 @@ async def on_command_error(ctx, error):
 
     raise error
 
-client.run(DISCORD_TOKEN)
+client.run(config.token)
