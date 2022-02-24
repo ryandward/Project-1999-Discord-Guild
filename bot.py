@@ -935,24 +935,15 @@ async def who(ctx, level: int = None, player_class: str = None):
         order_by(Census.Time.desc())
 
     matching_toons = pd.read_sql(query.statement, query.session.bind)
-
     matching_toons = matching_toons[['Name', 'Time', 'ID']]
 
+    #formatting to make things pretty print in Discord
     matching_toons['Name'] = "`" + matching_toons['Name']
-
     matching_toons['ID'] = "`<@" + matching_toons['ID'] + ">"
-
     matching_toons = tabulate(matching_toons, headers="keys", showindex=False, tablefmt="plain")
-
-    # matching_toons = string1.split('\n')
-
-
     matching_toons = re.sub ("^(Name.*)", r"`\1`", matching_toons)
-    matching_toons = re.sub ("^ ", r"?", matching_toons)
-
 
     await ctx.reply(f"Here are registered {level} {player_class}s.")
-
     await ctx.reply(matching_toons)
 
     return
