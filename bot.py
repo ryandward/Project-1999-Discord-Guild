@@ -928,14 +928,13 @@ async def who(ctx, level: int = None, player_class: str = None):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
-    query = session.query(Census).\
+    toon_q = session.query(Census).\
         filter(Census.Class == player_class).\
         filter(Census.Level == level).\
         filter(Census.Status != "Dropped").\
         order_by(Census.Time.desc())
 
-    matching_toons = pd.read_sql(query.statement, query.session.bind)
-    matching_toons = matching_toons[['Name', 'Time', 'ID']]
+    matching_toons = pd.read_sql(toon_q.statement, toon_q.session.bind)[['Name', 'Time', 'ID']]
 
     if len(matching_toons) == 0:
 
