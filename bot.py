@@ -21,6 +21,7 @@ from sqlalchemy.ext.automap import automap_base
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func
 
 from difflib import get_close_matches as gcm
 from discord.ext import commands
@@ -642,10 +643,9 @@ async def logs(ctx, *, args):
             player_class = player_classes.loc[player_classes["Class_name"]
                                               == f"{level_class[1]} {level_class[2]}", "Class"].item()
 
-        sql_response = "INSERT INTO attendance (Date, Raid, Name, Level, Class, ID) VALUES (?, ?, ?, ?, ?, ?);"
+        sql_response = "INSERT INTO attendance (Date, Raid, Name, ID) VALUES (?, ?, ?, ?);"
 
-        cur.execute(sql_response, (timestamp, raid, name,
-                    level, player_class, discord_ID))
+        cur.execute(sql_response, (timestamp, raid, name, discord_ID))
 
         if cur.rowcount == 1:
             con.commit()
@@ -730,7 +730,7 @@ async def rap(ctx, toon=None):
     elapsed = current_time - datetime.datetime.fromtimestamp(mtime)
     elapsed = chop_microseconds(elapsed)
 
-    if elapsed < datetime.timedelta(minutes = 1):
+    if elapsed < datetime.timedelta(minutes = 60):
         RAP_age = f"RAP synced {str((elapsed))} ago."
 
     elif elapsed >= datetime.timedelta(minutes = 1):
@@ -916,7 +916,10 @@ async def who(ctx, level: int = None, player_class: str = None):
     Base = automap_base()
     engine = create_engine(config.db_url)
     Base.prepare(engine, reflect=True)
+
     Census = Base.classes.census
+    Attendance = Base.classes.attendance
+
     session = Session(engine)
 
     if (level == None or level < 1 or level > 60):
@@ -932,9 +935,13 @@ async def who(ctx, level: int = None, player_class: str = None):
         filter(Census.Class == player_class).\
         filter(Census.Level == level).\
         filter(Census.Status != "Dropped").\
-        order_by(Census.Time.desc())
+        join(Attendance, Attendance.ID == Census.ID).\
+        having(func.max(Attendance.Date)).group_by(Attendance.ID).\
+        order_by(Attendance.Date.desc())
 
-    matching_toons = pd.read_sql(toon_q.statement, toon_q.session.bind)[['Name', 'Time', 'ID']]
+    # att_q = session.query(Attendance).having(func.max(Attendance.Date)).group_by(Attendance.ID)
+
+    matching_toons = pd.read_sql(toon_q.statement, toon_q.session.bind)[['Name', 'ID']]
 
     if len(matching_toons) == 0:
 
@@ -946,8 +953,8 @@ async def who(ctx, level: int = None, player_class: str = None):
         matching_toons['ID'] = "`<@" + matching_toons['ID'] + ">"
         matching_toons = tabulate(matching_toons, headers="keys", showindex=False, tablefmt="plain")
         matching_toons = re.sub ("^(Name.*)", r"`\1`", matching_toons)
+        matching_toons = f":white_check_mark:Registered level `{level}` `{player_class}s`, sorted by most recently earned DKP on any character.\n" + matching_toons
 
-        await ctx.reply(f"Here are registered level {level} {player_class}s.")
         await ctx.reply(matching_toons)
 
     return
