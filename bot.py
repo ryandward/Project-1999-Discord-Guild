@@ -643,9 +643,9 @@ async def logs(ctx, *, args):
             player_class = player_classes.loc[player_classes["Class_name"]
                                               == f"{level_class[1]} {level_class[2]}", "Class"].item()
 
-        sql_response = "INSERT INTO attendance (Date, Raid, Name, ID) VALUES (?, ?, ?, ?);"
+        sql_response = "INSERT INTO attendance (Date, Raid, Name, ID, Modifier) VALUES (?, ?, ?, ?, ?);"
 
-        cur.execute(sql_response, (timestamp, raid, name, discord_ID))
+        cur.execute(sql_response, (timestamp, raid, name, discord_ID, modifier))
 
         if cur.rowcount == 1:
             con.commit()
