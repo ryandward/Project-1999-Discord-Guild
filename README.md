@@ -14,13 +14,10 @@ To bring your local schema up to date, run `alembic upgrade head`
 Moving from an un-managed schema to a schema managed by alembic requires some
 additional steps.
 1. back up the ex_astra.db file
-2. dump the data from the db
-- `sqlite3 ex_astra.db .dump > dump.sql`
-- delete all the `CREATE TABLE` statements from the dump.sql file
-3. remove ex_astra.db
-4. run the alembic migration - this will create a new ex_astra.db file with the appropriate schema
-5. load the backed up data into the db
-- `sqlite3 ex_astra.db < dump.sql`
+2. run the `database_etl` script found in the scripts/ directory
+- this dumps the database, creates a new db using the first schema migration,
+transforms the data, and loads it into the new database.
+3. Further schema migrations can be run normally using `alembic upgrade head`
 
 ### Setup a discord bot
 If you need to add a bot for testing, follow the instructions here:
