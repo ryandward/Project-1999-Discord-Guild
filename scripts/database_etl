@@ -1,0 +1,39 @@
+#!/usr/local/bin/bash
+set +eux
+
+scripts_dir=$(dirname $(realpath $0))
+timestamp=$(date '+%s')
+
+if [[ $(uname -a) =~ "Darwin" ]]
+then sed_bin="gsed"
+else sed_bin="sed"
+fi
+
+(
+cd $scripts_dir/..
+source .env/bin/activate
+
+echo "Dumping data from db"
+cp ex_astra.db ex_astra.db.bak.$timestamp
+sqlite3 ex_astra.db .dump > dump_raw.sql
+rm ex_astra.db
+
+echo "Re-creating database"
+alembic upgrade c88c
+
+echo "Transforming db dump"
+$sed_bin '/^\(INSERT\|PRAGMA\|BEGIN\|COMMIT\)/!d' dump_raw.sql > dump_modified.sql
+$sed_bin -i '/sqlite_sequence/d' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(dkp\)\(.*\)$/\1\2\(discord_name, earned_dkp, spent_dkp, discord_id, date_joined\)\3/g' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(census\)\(.*\)$/\1\2\(name, discord_id, character_class, level, status, time\)\3/g' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(races\)\(.*\)$/\1\2\(race\)\3/g' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(raids\)\(.*\)$/\1\2\(raid, type, modifier\)\3/g' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(class_definitions\)\(.*\)$/\1\2\(class_name, character_class\)\3/g' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(bank\)\(.*\)$/\1\2\(banker, location, name, eq_item_id, count, slots, time\)\3/g' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(trash\)\(.*\)$/\1\2\(name\)\3/g' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(items\)\(.*\)$/\1\2\(name, date, item, dkp_spent, note, discord_id\)\3/g' dump_modified.sql
+$sed_bin -i 's/^\(.*\)\(attendance\)\(.*\)$/\1\2\(raid, name, date, discord_id, id, modifier\)\3/g' dump_modified.sql
+
+echo "Loading transformed db dump"
+sqlite3 ex_astra.db < dump_modified.sql
+)

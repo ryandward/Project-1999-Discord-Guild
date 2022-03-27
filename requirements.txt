@@ -1,5 +1,6 @@
 aiohttp==3.7.4.post0
 aiosignal==1.2.0
+alembic==1.7.7
 async-timeout==3.0.1
 attrs==21.4.0
 cachetools==5.0.0
@@ -15,6 +16,8 @@ google-auth-oauthlib==0.4.6
 greenlet==1.1.2
 gspread==5.1.1
 idna==3.3
+Mako==1.2.0
+MarkupSafe==2.1.1
 multidict==6.0.2
 numpy==1.22.2
 oauthlib==3.2.0

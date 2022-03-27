@@ -1,3 +1,6 @@
 .env
 __pycache__
 config.py
+ex_astra.db
+
+.idea/
