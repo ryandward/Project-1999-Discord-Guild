@@ -1016,7 +1016,7 @@ async def ding(ctx, weeks_ago=1):
             senior = len(df[(df["level"] >=46) & (df["level"] <=60)])
             df = df.head(5)
             name_results = df["name"].to_string(index=False).replace(" ", "")
-            class_results = df["class"].to_string(index=False).replace(" ", "")
+            class_results = df["character_class"].to_string(index=False).replace(" ", "")
             level_results = df["level"].to_string(index=False)
             display_time = time_frame.strftime('%H:%M %x %Z')
             dingers = int(records/weeks_ago)
@@ -1031,7 +1031,7 @@ async def ding(ctx, weeks_ago=1):
                     value=name_results,
                     inline=True)
             search_embed.add_field(
-                    name="class",
+                    name="character_class",
                     value=class_results,
                     inline=True)
             search_embed.add_field(
