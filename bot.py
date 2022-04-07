@@ -1006,18 +1006,18 @@ async def ding(ctx, weeks_ago=1):
             time_frame = start_date
         engine = sqlalchemy.create_engine(config.db_url, echo=False)
         df = pd.read_sql_table("census", con=engine)
-        df["Time"] = pd.to_datetime(df["Time"], format="%Y-%m-%d %H:%M:%S")
-        df = df[(df["Time"] >= time_frame)].sort_values(by=['Time'], ascending=False)
+        df["time"] = pd.to_datetime(df["time"], format="%Y-%m-%d %H:%M:%S")
+        df = df[(df["time"] >= time_frame)].sort_values(by=['time'], ascending=False)
         if len(df):
             records = len(df)
-            avg_level = int(df["Level"].sum()/records)
-            fledgling = len(df[(df["Level"] >=1) & (df["Level"] <=24)])
-            junior = len(df[(df["Level"] >=25) & (df["Level"] <=45)])
-            senior = len(df[(df["Level"] >=46) & (df["Level"] <=60)])
+            avg_level = int(df["level"].sum()/records)
+            fledgling = len(df[(df["level"] >=1) & (df["level"] <=24)])
+            junior = len(df[(df["level"] >=25) & (df["level"] <=45)])
+            senior = len(df[(df["level"] >=46) & (df["level"] <=60)])
             df = df.head(5)
-            name_results = df["Name"].to_string(index=False).replace(" ", "")
-            class_results = df["Class"].to_string(index=False).replace(" ", "")
-            level_results = df["Level"].to_string(index=False)
+            name_results = df["name"].to_string(index=False).replace(" ", "")
+            class_results = df["class"].to_string(index=False).replace(" ", "")
+            level_results = df["level"].to_string(index=False)
             display_time = time_frame.strftime('%H:%M %x %Z')
             dingers = int(records/weeks_ago)
 
@@ -1027,15 +1027,15 @@ async def ding(ctx, weeks_ago=1):
                     colour=discord.Colour.from_rgb(0, 35, 102))
 
             search_embed.add_field(
-                    name="Name",
+                    name="name",
                     value=name_results,
                     inline=True)
             search_embed.add_field(
-                    name="Class",
+                    name="class",
                     value=class_results,
                     inline=True)
             search_embed.add_field(
-                    name="Level",
+                    name="level",
                     value=level_results,
                     inline=True)
 
