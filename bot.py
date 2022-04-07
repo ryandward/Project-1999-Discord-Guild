@@ -1168,7 +1168,7 @@ def get_level_range(level):
 #   implement ~ RETURN ONLY ACTIVE DISCORD USERS
 @client.command()
 async def lfg(ctx, level):
-    if ctx.channel.id == 961699086300487750:
+    if ctx.channel.id == 851580315474591786:
         if level.isnumeric():
             if int(level) > 0 and int(level) < 61:
                 level = int(level)
@@ -1222,7 +1222,7 @@ async def lfg(ctx, level):
 #   implement ~ RETURN ONLY ACTIVE DISCORD USERS
 @client.command()
 async def groupfinder(ctx, class_name, level):
-    if ctx.channel.id == 961699086300487750:
+    if ctx.channel.id == 851580315474591786:
         if class_name in listOfClasses:
             if level.isnumeric():
                 if int(level) > 0 and int(level) < 61:          
