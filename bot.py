@@ -6,13 +6,13 @@ from sqlalchemy import create_engine
 import config
 import datetime
 import discord
-import gspread  # Python API for Google Sheets
+import gspread
 import io
 import pandas as pd
 import re
 import requests
 import time
-import pytz # time zone calcs
+import pytz
 import sqlite3
 import sqlalchemy
 import subprocess
@@ -70,7 +70,7 @@ client = commands.Bot(
 
 def get_player_class(player_class):
     player_class = titlecase(player_class)
-    player_class_names = player_classes['Class_name'].to_list()
+    player_class_names = player_classes['class_name'].to_list()
     player_class_name = gcm(player_class, player_class_names, n=1, cutoff=0.5)
 
     if len(player_class_name) == 0:
@@ -79,8 +79,8 @@ def get_player_class(player_class):
 
     else:
         player_class_name = player_class_name[0]
-        player_class = player_classes.loc[player_classes['Class_name']
-                                          == player_class_name, 'Class'].item()
+        player_class = player_classes.loc[player_classes['class_name']
+                                          == player_class_name, 'character_class'].item()
         return (player_class)
 
 def get_level(level):
@@ -90,22 +90,17 @@ def get_level(level):
     else:
         return (level)
 
-
 # Startup Information
 @client.event
 async def on_ready():
     print('Connected to bot:{}'.format(client.user.name))
-
     print('Bot ID:{}'.format(client.user.id))
 
 @client.command()
 async def ping(ctx):
     pingtime = time.time()
-
-    pingms = await ctx.reply("Pinging...")
-
+    await ctx.reply("Pinging...")
     ping = time.time() - pingtime
-
     await ctx.reply(":ping_pong: time is `%.01f seconds`" % ping)
 
 @client.command()
@@ -118,25 +113,25 @@ async def deduct(ctx, amount: int, name, *, args):
 
     name = titlecase(name)
 
-    if len(census.loc[census["Name"] == name, "ID"]) == 0:
+    if len(census.loc[census["name"] == name, "discord_id"]) == 0:
         await ctx.reply(f":exclamation:No character named `{name}` was found.")
         # this is an error
         return
 
-    discord_ID = census.loc[census["Name"] == name, "ID"].item()
+    discord_ID = census.loc[census["name"] == name, "discord_id"].item()
 
-    earned_dkp = dkp.loc[dkp["ID"] == discord_ID, "Earned_DKP"].item()
+    earned_dkp = dkp.loc[dkp["discord_id"] == discord_ID, "earned_dkp"].item()
 
-    spent_dkp = dkp.loc[dkp["ID"] == discord_ID, "Spent_DKP"].item()
+    spent_dkp = dkp.loc[dkp["discord_id"] == discord_ID, "spent_dkp"].item()
 
     current_dkp = earned_dkp - spent_dkp
 
     if current_dkp >= amount:
-        cur.execute('INSERT INTO items (Name, Item, DKP, Date, ID) VALUES (?, ?, ?, ?, ?);',
+        cur.execute('INSERT INTO items (name, item, dkp, date, discord_id) VALUES (?, ?, ?, ?, ?);',
                     (name.capitalize(), titlecase(args), amount, current_time, discord_ID))
 
         if cur.rowcount == 1:
-            cur.execute('UPDATE dkp SET Spent_DKP = Spent_DKP + ? WHERE ID = ?;',
+            cur.execute('UPDATE dkp SET spent_dkp = spent_dkp + ? WHERE discord_id = ?;',
                         (str(amount), discord_ID))
 
             if cur.rowcount == 1:
@@ -166,13 +161,13 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
     if player_class is not None:
         player_class = get_player_class(player_class)
 
-    cur.execute('SELECT * FROM census WHERE Name == ?;', (toon.capitalize(),))
+    cur.execute('SELECT * FROM census WHERE name == ?;', (toon.capitalize(),))
 
     col_names = list(map(lambda x: x[0], cur.description))
 
     rows = cur.fetchall()
 
-    cur.execute('SELECT * FROM dkp WHERE ID == ?;', (discord_id,))
+    cur.execute('SELECT * FROM dkp WHERE discord_id == ?;', (discord_id,))
 
     col_names = list(map(lambda x: x[0], cur.description))
 
@@ -183,7 +178,7 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 
         discord_id = ctx.message.guild.get_member_named(user_name).id
 
-        cur.execute('INSERT INTO dkp (Discord, Earned_DKP, Spent_DKP, Date_Joined, ID) VALUES (?, 5, 0, ?, ?);',
+        cur.execute('INSERT INTO dkp (discord_name, earned_dkp, spent_dkp, date_joined, discord_id) VALUES (?, 5, 0, ?, ?);',
                     (user_name, current_time, discord_id))
 
         if cur.rowcount == 1:
@@ -214,7 +209,7 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 
         if level is None:
 
-            cur.execute('UPDATE Census SET Status = ?, Time = ? WHERE Name = ?;',
+            cur.execute('UPDATE census SET status = ?, time = ? WHERE name = ?;',
                         (status.capitalize(), current_time, toon.capitalize()))
 
             if cur.rowcount == 1:
@@ -233,7 +228,7 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 
             if player_class is None:
 
-                cur.execute('UPDATE Census SET Status = ?, Level = ?, Time = ? WHERE Name = ?;',
+                cur.execute('UPDATE census SET status = ?, level = ?, time = ? WHERE name = ?;',
                             (status.capitalize(), level, current_time, toon.capitalize()))
 
                 if cur.rowcount == 1:
@@ -250,7 +245,7 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 
             if player_class is not None:
 
-                cur.execute('UPDATE Census SET Status = ?, Level = ?, Class = ?, Time = ? WHERE Name = ?;',
+                cur.execute('UPDATE census SET status = ?, level = ?, character_class = ?, time = ? WHERE name = ?;',
                             (status.capitalize(), level, player_class, current_time, toon.capitalize()))
 
                 if cur.rowcount == 1:
@@ -272,7 +267,7 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 
         else:
 
-            cur.execute('INSERT INTO census (Name, Level, Class, ID, Status, Time) VALUES (?, ?, ?, ?, ?, ?);',
+            cur.execute('INSERT INTO census (name, level, character_class, discord_id, status, time) VALUES (?, ?, ?, ?, ?, ?);',
                         (toon.capitalize(), level, player_class, discord_id, status.capitalize(), current_time))
 
             if cur.rowcount == 1:
@@ -293,7 +288,7 @@ async def promote(ctx, name):
     name = titlecase(name)
     census = pd.read_sql_query('SELECT * FROM census', con)
     dkp = pd.read_sql_query('SELECT * FROM dkp', con)
-    discord_ID = census.loc[census["Name"] == name, "ID"].item()
+    discord_ID = census.loc[census["name"] == name, "discord_id"].item()
 
     channel = client.get_channel(851549677815070751)  # census chat
     member = await ctx.guild.fetch_member(discord_ID)
@@ -322,12 +317,12 @@ async def main(ctx, toon, level: int = None, player_class: str = None):
 
     census = pd.read_sql_query('SELECT * FROM census', con)
 
-    toon_discord_ID = census.loc[census["Name"] == toon, "ID"]
+    toon_discord_ID = census.loc[census["name"] == toon, "discord_id"]
 
     if len(toon_discord_ID) > 0:
         toon_discord_ID = toon_discord_ID.item()
-        toon_mains = census.loc[(census['ID'] == toon_discord_ID) & (
-            census['Status'] == "Main") & (census['Name'] != toon), 'Name'].to_list()
+        toon_mains = census.loc[(census['discord_id'] == toon_discord_ID) & (
+            census['status'] == "Main") & (census['name'] != toon), 'name'].to_list()
 
         for i in toon_mains:
             await alt(ctx, i)
@@ -335,8 +330,8 @@ async def main(ctx, toon, level: int = None, player_class: str = None):
     else:
         user_discord_ID = str(
             ctx.message.guild.get_member_named(format(ctx.author)).id)
-        user_mains = census.loc[(census['ID'] == user_discord_ID) & (
-            census['Status'] == "Main") & (census['Name'] != toon), 'Name'].to_list()
+        user_mains = census.loc[(census['discord_id'] == user_discord_ID) & (
+            census['status'] == "Main") & (census['name'] != toon), 'name'].to_list()
 
         for i in user_mains:
             await alt(ctx, i)
@@ -363,7 +358,7 @@ async def alt(ctx, toon, level: int = None, player_class: str = None):
 async def drop(ctx, toon, level: int = None, player_class: str = None):
 
     user_name = format(ctx.author)
-    cur.execute("SELECT DISTINCT Name from census WHERE Status == ? and Name == ?;",
+    cur.execute("SELECT DISTINCT name from census WHERE status == ? and name == ?;",
                 ('Dropped', toon.capitalize()))
     rows = cur.fetchall()
 
@@ -384,7 +379,7 @@ async def level(ctx, toon, level):
         await ctx.reply(f"Try `!level <toon> <level>`. Also make sure {toon} has been registered with `!main` or `!alt`.")
         return
 
-    cur.execute('UPDATE Census SET Level = ?, Time = ? WHERE Name = ?;',
+    cur.execute('UPDATE census SET level = ?, time = ? WHERE name = ?;',
                 (level, current_time, toon.capitalize()))
     if cur.rowcount == 1:
         con.commit()
@@ -408,16 +403,16 @@ async def toons(ctx, toon=None):
     census     = pd.read_sql_table("census", con=engine)
 
     if toon == None:
-        toons = census.loc[census["ID"] == str(discord_id)]
+        toons = census.loc[census["discord_id"] == str(discord_id)]
 
     else:
-        toon_ids = census.loc[census["Name"] == toon.capitalize()]
-        toons    = census.loc[census["ID"].isin((toon_ids['ID']))]
+        toon_ids = census.loc[census["name"] == toon.capitalize()]
+        toons    = census.loc[census["discord_id"].isin((toon_ids['discord_id']))]
 
     col_names  = toons.columns
-    main_toons = toons[toons['Status'] == "Main"]
-    alt_toons  = toons[toons['Status'] == "Alt"]
-    bot_toons  = toons[toons['Status'] == "Bot"]
+    main_toons = toons[toons['status'] == "Main"]
+    alt_toons  = toons[toons['status'] == "Alt"]
+    bot_toons  = toons[toons['status'] == "Bot"]
 
     toons_list = discord.Embed(
         title=f":book:Census data entry",
@@ -433,17 +428,17 @@ async def toons(ctx, toon=None):
 
         toons_list.add_field(
             name=":bust_in_silhouette: Name",
-            value=main_toons.Name.to_string(index=False),
+            value=main_toons.name.to_string(index=False),
             inline=True)
 
         toons_list.add_field(
             name=":crossed_swords:️ Class",
-            value=main_toons.Class.to_string(index=False),
+            value=main_toons.character_class.to_string(index=False),
             inline=True)
 
         toons_list.add_field(
             name=":arrow_double_up: Level",
-            value=main_toons.Level.to_string(
+            value=main_toons.level.to_string(
                 index=False),
             inline=True)
 
@@ -456,15 +451,15 @@ async def toons(ctx, toon=None):
 
         toons_list.add_field(
             name=":bust_in_silhouette: Name",
-            value=alt_toons.Name.to_string(index=False), inline=True)
+            value=alt_toons.name.to_string(index=False), inline=True)
 
         toons_list.add_field(
             name=":crossed_swords:️ Class",
-            value=alt_toons.Class.to_string(index=False), inline=True)
+            value=alt_toons.character_class.to_string(index=False), inline=True)
 
         toons_list.add_field(
             name=":arrow_double_up: Level",
-            value=alt_toons.Level.to_string(index=False),
+            value=alt_toons.level.to_string(index=False),
             inline=True)
 
     if len(bot_toons) > 0:
@@ -476,15 +471,15 @@ async def toons(ctx, toon=None):
 
         toons_list.add_field(
             name=":bust_in_silhouette: Name",
-            value=bot_toons.Name.to_string(index=False), inline=True)
+            value=bot_toons.name.to_string(index=False), inline=True)
 
         toons_list.add_field(
             name=":crossed_swords:️ Class",
-            value=bot_toons.Class.to_string(index=False), inline=True)
+            value=bot_toons.character_class.to_string(index=False), inline=True)
 
         toons_list.add_field(
             name=":arrow_double_up: Level",
-            value=bot_toons.Level.to_string(index=False),
+            value=bot_toons.level.to_string(index=False),
             inline=True)
 
     toons_list.set_footer(text="Fetched at local time")
@@ -505,16 +500,16 @@ async def dkp(ctx, toon=None):
     if toon == None:
         user = format(ctx.author)
 
-        dkp_mains = census[('Main' == census.Status) & (census.ID.isin(census[census.ID == discord_id]['ID']))][['ID', 'Name']]
+        dkp_mains = census[('Main' == census.status) & (census.discord_id.isin(census[census.discord_id == discord_id]['discord_id']))][['discord_id', 'name']]
 
     else:
         user = toon.capitalize()
 
-        dkp_mains = census[('Main' == census.Status) & (census.ID.isin(census[census.Name == toon.capitalize()]['ID']))][['ID', 'Name']]
+        dkp_mains = census[('Main' == census.status) & (census.discord_id.isin(census[census.name == toon.capitalize()]['discord_id']))][['discord_id', 'name']]
 
-    dkp_dict = dkp.merge(dkp_mains, how = 'inner', on = 'ID')
+    dkp_dict = dkp.merge(dkp_mains, how = 'inner', on = 'discord_id')
 
-    dkp_dict["Current_DKP"] = dkp_dict["Earned_DKP"] - dkp_dict["Spent_DKP"]
+    dkp_dict["current_dkp"] = dkp_dict["earned_dkp"] - dkp_dict["spent_dkp"]
 
     rows = len(dkp_dict)
 
@@ -527,17 +522,17 @@ async def dkp(ctx, toon=None):
 
         embed.add_field(
             name=":bust_in_silhouette:️ Main Toon",
-            value=dkp_dict["Name"].to_string(index=False),
+            value=dkp_dict["name"].to_string(index=False),
             inline=True)
 
         embed.add_field(
             name=":arrow_up:️ Current DKP",
-            value=dkp_dict["Current_DKP"].to_string(index=False),
+            value=dkp_dict["current_dkp"].to_string(index=False),
             inline=True)
 
         embed.add_field(
             name=":moneybag: Total Earned",
-            value=dkp_dict["Earned_DKP"].to_string(index=False),
+            value=dkp_dict["earned_dkp"].to_string(index=False),
             inline=True)
 
         embed.set_footer(
@@ -563,7 +558,6 @@ async def logs(ctx, *, args):
     census = pd.read_sql_query('SELECT * FROM census', con)
     dkp = pd.read_sql_query('SELECT * FROM dkp', con)
     raids = pd.read_sql_query('SELECT * FROM raids', con)
-    manned_bots = pd.read_sql_query('SELECT * FROM manned_bots', con)
 
     # timestamp
     re1 = '(?<=^\[).*?(?=])'
@@ -578,7 +572,7 @@ async def logs(ctx, *, args):
 
     # retrieve entire tables from SQLite
     # query how much this raid is worth
-    modifier = raids.loc[raids['Raid'] == raid, 'Modifier']
+    modifier = raids.loc[raids['raid'] == raid, 'modifier']
 
     # is there a raid modifier and is it unique?
     if len(modifier.index) == 1:
@@ -615,7 +609,7 @@ async def logs(ctx, *, args):
 
         # guild = line[3]
 
-        discord_ID = census.loc[census["Name"] == name, "ID"]
+        discord_ID = census.loc[census["name"] == name, "discord_id"]
 
         if len(discord_ID.index) == 1:
             discord_ID = discord_ID.item()
@@ -638,15 +632,15 @@ async def logs(ctx, *, args):
 
         elif len(level_class) == 2:
             level = level_class[0]
-            player_class = player_classes.loc[player_classes["Class_name"]
-                                              == level_class[1], "Class"].item()
+            player_class = player_classes.loc[player_classes["class_name"]
+                                              == level_class[1], "character_class"].item()
 
         elif len(level_class) == 3:
             level = level_class[0]
-            player_class = player_classes.loc[player_classes["Class_name"]
-                                              == f"{level_class[1]} {level_class[2]}", "Class"].item()
+            player_class = player_classes.loc[player_classes["class_name"]
+                                              == f"{level_class[1]} {level_class[2]}", "character_class"].item()
 
-        sql_response = "INSERT INTO attendance (Date, Raid, Name, ID, Modifier) VALUES (?, ?, ?, ?, ?);"
+        sql_response = "INSERT INTO attendance (date, raid, name, discord_id, modifier) VALUES (?, ?, ?, ?, ?);"
 
         cur.execute(sql_response, (timestamp, raid, name, discord_ID, modifier))
 
@@ -657,7 +651,7 @@ async def logs(ctx, *, args):
             await ctx.reply(f"Something is wrong with the record: {record}")
             con.rollback()
 
-        sql_response = "UPDATE dkp SET Earned_DKP = Earned_DKP + ? WHERE ID == ?;"
+        sql_response = "UPDATE dkp SET earned_dkp = earned_dkp + ? WHERE discord_id == ?;"
         cur.execute(sql_response, (modifier, discord_ID))
         # await ctx.reply(sql_response)
 
@@ -759,16 +753,16 @@ async def rap(ctx, toon=None):
     if toon != None:
         toon = toon.capitalize()
         user_name = format(toon)
-        discord_id = census.loc[census['Name'] == toon, 'ID'].item()
+        discord_id = census.loc[census['name'] == toon, 'discord_id'].item()
 
     inner_merged = pd.merge(
         rap_totals, census, left_on="Name", right_on="Name", how="inner")
 
-    inner_merged = inner_merged[['ID', 'Name', 'RAP']]
+    inner_merged = inner_merged[['discord_id', 'Name', 'RAP']]
 
-    inner_merged = inner_merged.sort_values(by=['Name'])
+    inner_merged = inner_merged.sort_values(by=['name'])
 
-    rap_totals = inner_merged.loc[inner_merged['ID'] == discord_id]
+    rap_totals = inner_merged.loc[inner_merged['discord_id'] == discord_id]
 
     rap_list = discord.Embed(
         title=f":dragon:RAP for `{user_name}`",
@@ -817,7 +811,7 @@ async def bank(ctx):
 
     inventory.insert(0, "Time", current_time)
 
-    sql_response = "DELETE FROM bank WHERE Banker == ?"
+    sql_response = "DELETE FROM bank WHERE banker == ?"
 
     cur.execute(sql_response, (banker_name, ))
     con.commit()
@@ -835,16 +829,16 @@ async def find(ctx, *, name):
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
     bank = pd.read_sql_table("bank", con=engine)
     trash = pd.read_sql_table("trash", con=engine)
-    bank = bank[~bank['Name'].isin(trash['Name'])]
+    bank = bank[~bank['name'].isin(trash['name'])]
 
-    bank["Name"] = bank["Name"].apply(titlecase)
+    bank["name"] = bank["name"].apply(titlecase)
 
-    bank["Name"] = bank["Name"].str.replace("`", "'")
+    bank["name"] = bank["name"].str.replace("`", "'")
 
     search_results = bank[bank["Name"].str.contains(
-        name)][["Banker", "Name", "Location", "Count", "Time"]]
+        name)][["banker", "name", "location", "count", "time"]]
 
-    unique_bankers = search_results["Banker"].unique()
+    unique_bankers = search_results["banker"].unique()
 
     if len(unique_bankers) == 0:
 
@@ -853,7 +847,7 @@ async def find(ctx, *, name):
     else:
         for i in unique_bankers:
 
-            banker_results = search_results.loc[search_results["Banker"] == i]
+            banker_results = search_results.loc[search_results["banker"] == i]
 
             search_embed = discord.Embed(
                 title=f":gem: Treasury Query for `{name}`",
@@ -867,7 +861,7 @@ async def find(ctx, *, name):
 
             search_embed.add_field(
                 name=":bust_in_silhouette: Item",
-                value=banker_results.Name.to_string(index=False),
+                value=banker_results.name.to_string(index=False),
                 inline=True)
 
             search_embed.add_field(
@@ -877,7 +871,7 @@ async def find(ctx, *, name):
 
             search_embed.add_field(
                 name=":arrow_up:️ Count",
-                value=banker_results.Count.to_string(index=False), inline=True)
+                value=banker_results.count.to_string(index=False), inline=True)
 
             search_embed.set_footer(text="Fetched at local time")
 
@@ -894,13 +888,13 @@ async def banktotals(ctx):
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
     bank = pd.read_sql_table("bank", con=engine)
     trash = pd.read_sql_table("trash", con=engine)
-    bank = bank[~bank['Name'].isin(trash['Name'])]
+    bank = bank[~bank['name'].isin(trash['name'])]
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
     banktotals_file = "banktotals-" + current_time + ".txt"
 
-    banktotals = bank.groupby(['Name'])['Count'].sum().to_frame()
+    banktotals = bank.groupby(['name'])['count'].sum().to_frame()
 
     banktotals = tabulate(banktotals, headers="keys", tablefmt="psql")
 
@@ -935,16 +929,16 @@ async def who(ctx, level: int = None, player_class: str = None):
     current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
     toon_q = session.query(Census).\
-        filter(Census.Class == player_class).\
-        filter(Census.Level == level).\
-        filter(Census.Status != "Dropped").\
-        join(Attendance, Attendance.ID == Census.ID).\
-        having(func.max(Attendance.Date)).group_by(Attendance.ID).\
-        order_by(Attendance.Date.desc())
+        filter(Census.character_class == player_class).\
+        filter(Census.level == level).\
+        filter(Census.status != "Dropped").\
+        join(Attendance, Attendance.discord_id == Census.discord_id).\
+        having(func.max(Attendance.date)).group_by(Attendance.discord_id).\
+        order_by(Attendance.date.desc())
 
     # att_q = session.query(Attendance).having(func.max(Attendance.Date)).group_by(Attendance.ID)
 
-    matching_toons = pd.read_sql(toon_q.statement, toon_q.session.bind)[['Name', 'ID']]
+    matching_toons = pd.read_sql(toon_q.statement, toon_q.session.bind)[['name', 'discord_id']]
 
     if len(matching_toons) == 0:
 
@@ -952,10 +946,10 @@ async def who(ctx, level: int = None, player_class: str = None):
 
     else:
         #formatting to make things pretty print in Discord
-        matching_toons['Name'] = "`" + matching_toons['Name']
-        matching_toons['ID'] = "`<@" + matching_toons['ID'] + ">"
+        matching_toons['name'] = "`" + matching_toons['name']
+        matching_toons['discord_id'] = "`<@" + matching_toons['discord_id'] + ">"
         matching_toons = tabulate(matching_toons, headers="keys", showindex=False, tablefmt="plain")
-        matching_toons = re.sub ("^(Name.*)", r"`\1`", matching_toons)
+        matching_toons = re.sub ("^(name.*)", r"`\1`", matching_toons)
         matching_toons = f":white_check_mark:Registered level `{level}` `{player_class}s`, sorted by most recently earned DKP on any character.\n" + matching_toons
 
         await ctx.reply(matching_toons)
@@ -975,21 +969,21 @@ async def claim(ctx, toon):
     Census = Base.classes.census
     session = Session(engine)
 
-    claimed_toon = session.query(Census).filter(Census.Name == toon).one()
+    claimed_toon = session.query(Census).filter(Census.name == toon).one()
 
-    old_owner = claimed_toon.ID
+    old_owner = claimed_toon.discord_id
 
-    if claimed_toon.Status == "Bot":
+    if claimed_toon.status == "Bot":
 
-        claimed_toon.ID = discord_id
+        claimed_toon.discord_id = discord_id
 
-        claimed_toon.Time = current_time
+        claimed_toon.time = current_time
 
         session.commit()
 
         await ctx.reply(f":white_check_mark:<@{discord_id}> has taken control of `{toon}` from <@{old_owner}>." )
 
-    if claimed_toon.Status != "Bot":
+    if claimed_toon.status != "Bot":
 
         await ctx.reply(f":exclamation:`{toon}` can only change ownership if <@{old_owner}> declares the toon as a `!bot`." )
 
