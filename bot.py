@@ -1027,15 +1027,15 @@ async def ding(ctx, weeks_ago=1):
                     colour=discord.Colour.from_rgb(0, 35, 102))
 
             search_embed.add_field(
-                    name="name",
+                    name="Name",
                     value=name_results,
                     inline=True)
             search_embed.add_field(
-                    name="character_class",
+                    name="Class",
                     value=class_results,
                     inline=True)
             search_embed.add_field(
-                    name="level",
+                    name="Level",
                     value=level_results,
                     inline=True)
 
@@ -1059,20 +1059,20 @@ async def bidhistory(ctx, *, name):
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
     items = pd.read_sql_table("items", con=engine)
-    items["Item"] = items["Item"].apply(titlecase)
-    items["Item"] = items["Item"].str.replace("`", "'")
-    search_results = items[items["Item"].str.contains(name)][["Name", "Item", "DKP", "Date"]]
+    items["item"] = items["item"].apply(titlecase)
+    items["item"] = items["item"].str.replace("`", "'")
+    search_results = items[items["item"].str.contains(name)][["name", "item", "dkp_spent", "date"]]
 
     if len(search_results) == 0:
         await ctx.reply(f"No winning bids for `{name}` were found.")
 
     else:
-        min_dkp = search_results["DKP"].min()
-        max_dkp = search_results["DKP"].max()
-        mean_dkp = search_results["DKP"].mean()
-        median_dkp = search_results["DKP"].median()
-        most_recent = max(search_results["Date"])
-        winners = search_results["Name"].to_string(index=False)
+        min_dkp = search_results["dkp_spent"].min()
+        max_dkp = search_results["dkp_spent"].max()
+        mean_dkp = search_results["dkp_spent"].mean()
+        median_dkp = search_results["dkp_spent"].median()
+        most_recent = max(search_results["date"])
+        winners = search_results["name"].to_string(index=False)
 
         search_embed = discord.Embed(
             title=f":gem: Bid History for `{name}`",
@@ -1116,10 +1116,10 @@ async def mentor(ctx, *, mentor_class):
         current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         engine = sqlalchemy.create_engine(config.db_url, echo=False)
         df = pd.read_sql_table("census", con=engine)
-        class_series = df[(df["Class"] == mentor_class) & (df["Status"] == "Main")].sort_values(by=['Level', 'Time'], ascending=False)
+        class_series = df[(df["character_class"] == mentor_class) & (df["status"] == "Main")].sort_values(by=['level', 'time'], ascending=False)
         mentor_results = class_series.head(10)
-        mentor_names = mentor_results["Name"].to_string(index=False).replace(" ", "")
-        mentor_levels = mentor_results["Level"].to_string(index=False).replace(" ", "")
+        mentor_names = mentor_results["name"].to_string(index=False).replace(" ", "")
+        mentor_levels = mentor_results["level"].to_string(index=False).replace(" ", "")
 
         search_embed = discord.Embed(
                 title=f":star: `{mentor_class}` class Mentors :star:",
@@ -1168,7 +1168,7 @@ def get_level_range(level):
 #   implement ~ RETURN ONLY ACTIVE DISCORD USERS
 @client.command()
 async def lfg(ctx, level):
-    if ctx.channel.id == 851580315474591786:
+    if ctx.channel.id == 961699086300487750:
         if level.isnumeric():
             if int(level) > 0 and int(level) < 61:
                 level = int(level)
@@ -1176,14 +1176,14 @@ async def lfg(ctx, level):
                 current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                 engine = sqlalchemy.create_engine(config.db_url, echo=False)
                 df = pd.read_sql_table("census", con=engine)
-                df = df[(df["Level"] >= min_lvl) & (df["Level"] <= max_lvl) & (df["Status"] != "Bot") & (df["Status"] != "Dropped") & (df["Status"] != "Banned")]
-                df["Difference"] = df["Level"] - level
-                df["Difference"] = pd.to_numeric(df["Difference"]).abs()
-                df = df.sort_values(by=["Difference", "Level", "Class"])
+                df = df[(df["level"] >= min_lvl) & (df["level"] <= max_lvl) & (df["status"] != "Bot") & (df["status"] != "Dropped") & (df["status"] != "Banned")]
+                df["difference"] = df["Level"] - level
+                df["difference"] = pd.to_numeric(df["difference"]).abs()
+                df = df.sort_values(by=["difference", "level", "character_class"])
                 group_results = df.head(60)
-                name_results = group_results["Name"].to_string(index=False).replace(" ", "")
-                class_results = group_results["Class"].to_string(index=False).replace(" ", "")
-                level_results = group_results["Level"].to_string(index=False)
+                name_results = group_results["name"].to_string(index=False).replace(" ", "")
+                class_results = group_results["character_class"].to_string(index=False).replace(" ", "")
+                level_results = group_results["level"].to_string(index=False)
 
                 search_embed = discord.Embed(
                         title=f"Guildies to group with at level `{level}`",
@@ -1222,7 +1222,7 @@ async def lfg(ctx, level):
 #   implement ~ RETURN ONLY ACTIVE DISCORD USERS
 @client.command()
 async def groupfinder(ctx, class_name, level):
-    if ctx.channel.id == 851580315474591786:
+    if ctx.channel.id == 961699086300487750:
         if class_name in listOfClasses:
             if level.isnumeric():
                 if int(level) > 0 and int(level) < 61:          
@@ -1231,13 +1231,13 @@ async def groupfinder(ctx, class_name, level):
                     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     engine = sqlalchemy.create_engine(config.db_url, echo=False)
                     df = pd.read_sql_table("census", con=engine)
-                    df = df[(df["Level"] >= min_lvl) & (df["Level"] <= max_lvl) & (df["Class"] == class_name ) & (df["Status"] != "Bot") & (df["Status"] != "Dropped") & (df["Status"] != "Banned")]
-                    df["Difference"] = df["Level"] - level
-                    df["Difference"] = pd.to_numeric(df["Difference"]).abs()
-                    df = df.sort_values(by=["Difference", "Level", "Class"])
+                    df = df[(df["level"] >= min_lvl) & (df["level"] <= max_lvl) & (df["character_class"] == class_name ) & (df["status"] != "Bot") & (df["status"] != "Dropped") & (df["status"] != "Banned")]
+                    df["difference"] = df["level"] - level
+                    df["difference"] = pd.to_numeric(df["difference"]).abs()
+                    df = df.sort_values(by=["difference", "level", "character_class"])
                     group_results = df.head(70)
-                    name_results = group_results["Name"].to_string(index=False).replace(" ", "")
-                    level_results = group_results["Level"].to_string(index=False).replace(" ", "")
+                    name_results = group_results["name"].to_string(index=False).replace(" ", "")
+                    level_results = group_results["level"].to_string(index=False).replace(" ", "")
 
                     search_embed = discord.Embed(
                             title=f"`{class_name}s` around lvl `{level}`",
