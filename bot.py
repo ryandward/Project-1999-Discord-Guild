@@ -1177,7 +1177,7 @@ async def lfg(ctx, level):
                 engine = sqlalchemy.create_engine(config.db_url, echo=False)
                 df = pd.read_sql_table("census", con=engine)
                 df = df[(df["level"] >= min_lvl) & (df["level"] <= max_lvl) & (df["status"] != "Bot") & (df["status"] != "Dropped") & (df["status"] != "Banned")]
-                df["difference"] = df["Level"] - level
+                df["difference"] = df["level"] - level
                 df["difference"] = pd.to_numeric(df["difference"]).abs()
                 df = df.sort_values(by=["difference", "level", "character_class"])
                 group_results = df.head(60)
