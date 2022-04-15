@@ -802,9 +802,9 @@ async def rap(ctx, toon=None):
         discord_id = census.loc[census['name'] == toon, 'discord_id'].item()
 
     inner_merged = pd.merge(
-        rap_totals, census, left_on="Name", right_on="Name", how="inner")
+        rap_totals, census, left_on="Name", right_on="name", how="inner")
 
-    inner_merged = inner_merged[['discord_id', 'Name', 'RAP']]
+    inner_merged = inner_merged[['discord_id', 'name', 'RAP']]
 
     inner_merged = inner_merged.sort_values(by=['name'])
 
@@ -824,7 +824,7 @@ async def rap(ctx, toon=None):
 
         rap_list.add_field(
             name=":bust_in_silhouette: Name",
-            value=rap_totals.Name.to_string(index=False),
+            value=rap_totals.name.to_string(index=False),
             inline=True)
 
         rap_list.add_field(
