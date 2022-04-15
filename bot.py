@@ -116,26 +116,26 @@ async def deduct(ctx, amount: int, name, *, args):
         # this is an error
         return
 
-    discord_ID = census.loc[census["name"] == name, "discord_id"].item()
+    discord_id = census.loc[census["name"] == name, "discord_id"].item()
 
-    earned_dkp = dkp.loc[dkp["discord_id"] == discord_ID, "earned_dkp"].item()
+    earned_dkp = dkp.loc[dkp["discord_id"] == discord_id, "earned_dkp"].item()
 
-    spent_dkp = dkp.loc[dkp["discord_id"] == discord_ID, "spent_dkp"].item()
+    spent_dkp = dkp.loc[dkp["discord_id"] == discord_id, "spent_dkp"].item()
 
     current_dkp = earned_dkp - spent_dkp
 
     if current_dkp >= amount:
-        cur.execute('INSERT INTO items (name, item, dkp, date, discord_id) VALUES (?, ?, ?, ?, ?);',
-                    (name.capitalize(), titlecase(args), amount, current_time, discord_ID))
+        cur.execute('INSERT INTO items (name, item, dkp_spent, date, discord_id) VALUES (?, ?, ?, ?, ?);',
+                    (name.capitalize(), titlecase(args), amount, current_time, discord_id))
 
         if cur.rowcount == 1:
             cur.execute('UPDATE dkp SET spent_dkp = spent_dkp + ? WHERE discord_id = ?;',
-                        (str(amount), discord_ID))
+                        (str(amount), discord_id))
 
             if cur.rowcount == 1:
                 con.commit()
 
-                await ctx.reply(f":white_check_mark:<@{discord_ID}> spent `{amount}` DKP on `{titlecase(args)}` for `{name.capitalize()}`!")
+                await ctx.reply(f":white_check_mark:<@{discord_id}> spent `{amount}` DKP on `{titlecase(args)}` for `{name.capitalize()}`!")
 
             else:
                 con.rollback()
@@ -149,6 +149,54 @@ async def deduct(ctx, amount: int, name, *, args):
 
     else:
         await ctx.reply(f":exclamation:`{amount}` is greater than `{name.capitalize()}`'s current total of `{current_dkp}` DKP\nNo action taken")
+
+################################################################################
+
+@client.command()
+@commands.has_any_role('officer', 'probationary officer', 'lootmaster')
+async def award(ctx, amount: int, name, *, args):
+    census = pd.read_sql_query('SELECT * FROM census', con)
+
+    dkp = pd.read_sql_query('SELECT * FROM dkp', con)
+
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    name = titlecase(name)
+
+    if len(census.loc[census["name"] == name, "discord_id"]) == 0:
+        await ctx.reply(f":exclamation:No character named `{name}` was found.")
+        # this is an error
+        return
+
+    discord_id = census.loc[census["name"] == name, "discord_id"].item()
+
+    earned_dkp = dkp.loc[dkp["discord_id"] == discord_id, "earned_dkp"].item()
+
+    spent_dkp = dkp.loc[dkp["discord_id"] == discord_id, "spent_dkp"].item()
+
+    current_dkp = earned_dkp - spent_dkp
+
+    cur.execute('INSERT INTO attendance (raid, name, date, discord_id, modifier) VALUES (?, ?, ?, ?, ?);',
+                (titlecase(args), name.capitalize(), current_time, discord_id, amount))
+
+    if cur.rowcount == 1:
+        cur.execute('UPDATE dkp SET earned_dkp = earned_dkp + ? WHERE discord_id = ?;',
+                    (str(amount), discord_id))
+
+        if cur.rowcount == 1:
+            con.commit()
+
+            await ctx.reply(f":white_check_mark:<@{discord_id}> earned `{amount}` DKP for `{titlecase(args)}` on `{name.capitalize()}`!")
+
+        else:
+            con.rollback()
+
+            await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error -2`")
+
+    else:
+        con.rollback()
+
+        await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error -1`")
 
 ########################################################################################################
 async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None):
@@ -286,10 +334,10 @@ async def promote(ctx, name):
     name = titlecase(name)
     census = pd.read_sql_query('SELECT * FROM census', con)
     dkp = pd.read_sql_query('SELECT * FROM dkp', con)
-    discord_ID = census.loc[census["name"] == name, "discord_id"].item()
+    discord_id = census.loc[census["name"] == name, "discord_id"].item()
 
     channel = client.get_channel(851549677815070751)  # census chat
-    member = await ctx.guild.fetch_member(discord_ID)
+    member = await ctx.guild.fetch_member(discord_id)
     probationary_role = ctx.guild.get_role(
         884172643702546473)  # come back to this
     member_role = ctx.guild.get_role(870669705646587924)
@@ -297,8 +345,8 @@ async def promote(ctx, name):
     await member.remove_roles(probationary_role)
     await member.add_roles(member_role)
 
-    await ctx.reply(f"<@&849337092324327454> Send your congrats to <@{discord_ID}>, the newest full member of Ex Astra!")
-    await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_ID}>, the newest full member of Ex Astra!")
+    await ctx.reply(f"<@&849337092324327454> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
+    await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
 
 
 @client.command()
@@ -315,20 +363,20 @@ async def main(ctx, toon, level: int = None, player_class: str = None):
 
     census = pd.read_sql_query('SELECT * FROM census', con)
 
-    toon_discord_ID = census.loc[census["name"] == toon, "discord_id"]
+    toon_discord_id = census.loc[census["name"] == toon, "discord_id"]
 
-    if len(toon_discord_ID) > 0:
-        toon_discord_ID = toon_discord_ID.item()
-        toon_mains = census.loc[(census['discord_id'] == toon_discord_ID) & (
+    if len(toon_discord_id) > 0:
+        toon_discord_id = toon_discord_id.item()
+        toon_mains = census.loc[(census['discord_id'] == toon_discord_id) & (
             census['status'] == "Main") & (census['name'] != toon), 'name'].to_list()
 
         for i in toon_mains:
             await alt(ctx, i)
 
     else:
-        user_discord_ID = str(
+        user_discord_id = str(
             ctx.message.guild.get_member_named(format(ctx.author)).id)
-        user_mains = census.loc[(census['discord_id'] == user_discord_ID) & (
+        user_mains = census.loc[(census['discord_id'] == user_discord_id) & (
             census['status'] == "Main") & (census['name'] != toon), 'name'].to_list()
 
         for i in user_mains:
@@ -607,10 +655,10 @@ async def logs(ctx, *, args):
 
         # guild = line[3]
 
-        discord_ID = census.loc[census["name"] == name, "discord_id"]
+        discord_id = census.loc[census["name"] == name, "discord_id"]
 
-        if len(discord_ID.index) == 1:
-            discord_ID = discord_ID.item()
+        if len(discord_id.index) == 1:
+            discord_id = discord_id.item()
 
         # don't bother if the character isn't in the database linked to a discord
         else:
@@ -618,11 +666,11 @@ async def logs(ctx, *, args):
             continue
 
         # skip this round if the person is already here, prevent doubling
-        if f"<@{discord_ID}>" in seen_players:
+        if f"<@{discord_id}>" in seen_players:
             continue
 
         else:
-            seen_players.append(f"<@{discord_ID}>")
+            seen_players.append(f"<@{discord_id}>")
 
         if len(level_class) == 1:
             level = ""
@@ -640,7 +688,7 @@ async def logs(ctx, *, args):
 
         sql_response = "INSERT INTO attendance (date, raid, name, discord_id, modifier) VALUES (?, ?, ?, ?, ?);"
 
-        cur.execute(sql_response, (timestamp, raid, name, discord_ID, modifier))
+        cur.execute(sql_response, (timestamp, raid, name, discord_id, modifier))
 
         if cur.rowcount == 1:
             con.commit()
@@ -650,7 +698,7 @@ async def logs(ctx, *, args):
             con.rollback()
 
         sql_response = "UPDATE dkp SET earned_dkp = earned_dkp + ? WHERE discord_id == ?;"
-        cur.execute(sql_response, (modifier, discord_ID))
+        cur.execute(sql_response, (modifier, discord_id))
         # await ctx.reply(sql_response)
 
         if cur.rowcount == 1:
