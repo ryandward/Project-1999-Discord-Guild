@@ -636,7 +636,13 @@ async def logs(ctx, *, args):
     for record in records:
         # if the record doesn't contain the line "<Ex Astra>", move on
         # very important in case the line is blank
-        if "<Ex Astra>" not in record:
+        # if "<Ex Astra>" not in record:
+        #     continue
+
+        if len(record.strip()) == 0:
+            continue
+
+        if ("<" not in record or ">" not in record) and "ANONYMOUS" not in record:
             continue
 
         line = re.compile("(%s|%s|%s|%s)" %
@@ -853,6 +859,15 @@ async def bank(ctx):
     stream = urlopen(req).read()
     inventory = pd.read_csv(io.StringIO(stream.decode('utf-8')), sep="\t")
 
+    inventory = inventory.rename(
+        columns={
+            'Location': 'location',
+            'Name': 'name',
+            'ID': 'eq_item_id',
+            'Count': 'quantity',
+            'Slots': 'slots'})
+
+
     inventory.insert(0, "Banker", banker_name)
 
     inventory.insert(0, "Time", current_time)
@@ -881,8 +896,8 @@ async def find(ctx, *, name):
 
     bank["name"] = bank["name"].str.replace("`", "'")
 
-    search_results = bank[bank["Name"].str.contains(
-        name)][["banker", "name", "location", "count", "time"]]
+    search_results = bank[bank["name"].str.contains(
+        name)][["banker", "name", "location", "quantity", "time"]]
 
     unique_bankers = search_results["banker"].unique()
 
@@ -912,12 +927,12 @@ async def find(ctx, *, name):
 
             search_embed.add_field(
                 name=":question: Location",
-                value=banker_results.Location.to_string(index=False),
+                value=banker_results.location.to_string(index=False),
                 inline=True)
 
             search_embed.add_field(
-                name=":arrow_up:️ Count",
-                value=banker_results.count.to_string(index=False), inline=True)
+                name=":arrow_up:️ Quantity",
+                value=banker_results.quantity.to_string(index=False), inline=True)
 
             search_embed.set_footer(text="Fetched at local time")
 
@@ -940,7 +955,7 @@ async def banktotals(ctx):
 
     banktotals_file = "banktotals-" + current_time + ".txt"
 
-    banktotals = bank.groupby(['name'])['count'].sum().to_frame()
+    banktotals = bank.groupby(['name'])['quantity'].sum().to_frame()
 
     banktotals = tabulate(banktotals, headers="keys", tablefmt="psql")
 
