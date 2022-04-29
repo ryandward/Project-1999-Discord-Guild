@@ -8,6 +8,7 @@ import datetime
 import discord
 import gspread
 import io
+import os
 import pandas as pd
 import re
 import requests
@@ -964,6 +965,55 @@ async def banktotals(ctx):
     f.close()
 
     await ctx.reply(f':moneybag:Here is a text file with all the bank totals.', file=discord.File(banktotals_file))
+    os.remove(banktotals_file)
+    return
+
+@client.command()
+async def bidhistory(ctx):
+
+    engine = sqlalchemy.create_engine(config.db_url, echo=False)
+    discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    items = pd.read_sql_table("items", con=engine)
+    items = items.loc[items['discord_id'] == discord_id]
+    items = items[["name", "date", "item", "dkp_spent"]]
+    items = items.reset_index(drop=True)
+
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+    items_file = "bids-" + current_time + discord_id +".txt"
+
+    bidtotals = tabulate(items, headers="keys", tablefmt="psql")
+
+    f = open(items_file, "w")
+    f.write(bidtotals)
+    f.close()
+
+    await ctx.reply(f':moneybag:Here is a text file with your bid history.', file=discord.File(items_file))
+    os.remove(items_file)
+    return
+
+@client.command()
+async def dkphistory(ctx):
+
+    engine = sqlalchemy.create_engine(config.db_url, echo=False)
+    discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    attendance = pd.read_sql_table("attendance", con=engine)
+    attendance = attendance.loc[attendance['discord_id'] == discord_id]
+    attendance = attendance[["name", "date", "raid", "modifier"]]
+    items = attendance.reset_index(drop=True)
+
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+
+    dkp_file = "earnings-" + current_time + discord_id +".txt"
+
+    earntotals = tabulate(items, headers="keys", tablefmt="psql")
+
+    f = open(dkp_file, "w")
+    f.write(earntotals)
+    f.close()
+
+    await ctx.reply(f':moneybag:Here is a text file with your earnings history.', file=discord.File(dkp_file))
+    os.remove(dkp_file)
     return
 
 
