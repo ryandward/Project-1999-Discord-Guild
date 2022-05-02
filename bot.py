@@ -241,7 +241,8 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 
             formatted_id = f'<@{discord_id}>'
 
-            await channel.send(f"<@&849337092324327454> `{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
+            # await channel.send(f"<@&849337092324327454> `{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
+            await channel.send(f"`{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
 
         else:
             con.rollback()
@@ -339,16 +340,17 @@ async def promote(ctx, name):
 
     channel = client.get_channel(851549677815070751)  # census chat
     member = await ctx.guild.fetch_member(discord_id)
-    probationary_role = ctx.guild.get_role(
-        884172643702546473)  # come back to this
+    probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
     member_role = ctx.guild.get_role(870669705646587924)
 
     await member.remove_roles(probationary_role)
     await member.add_roles(member_role)
 
-    await ctx.reply(f"<@&849337092324327454> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
-    await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
+    # await ctx.reply(f"<@&849337092324327454> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
+    # await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
 
+    await ctx.reply(f"<@{discord_id}>, has been promoted to full member.")
+    await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
 
 @client.command()
 @commands.has_role("officer")
@@ -753,7 +755,7 @@ async def welcome(ctx):
 
     embed.add_field(
         name=":five:",
-        value="Need to talk to an officer? Tag an officer using <@&849337092324327454> in the <#838976036167090247> or other text channels.",
+        value="Need to talk to an officer? Tag an officer using <@&wait> in the <#838976036167090247> or other text channels.",
         inline=False)
 
     embed.add_field(
