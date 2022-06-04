@@ -51,6 +51,14 @@ def has_numbers(inputString):
 def chop_microseconds(delta):
     return delta - datetime.timedelta(microseconds=delta.microseconds)
 
+
+def check_reply(ctx):
+    result = ctx.message.reference
+    if result is None:
+        return False
+    else:
+        return True
+
 con = sqlite3.connect('ex_astra.db')
 con.execute('PRAGMA foreign_keys = ON')
 cur = con.cursor()
@@ -110,7 +118,7 @@ async def deduct(ctx, amount: int, name, *, args):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    name = titlecase(name)
+    name = name.capitalize()
 
     if len(census.loc[census["name"] == name, "discord_id"]) == 0:
         await ctx.reply(f":exclamation:No character named `{name}` was found.")
@@ -162,7 +170,7 @@ async def award(ctx, amount: int, name, *, args):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    name = titlecase(name)
+    name = name.capitalize()
 
     if len(census.loc[census["name"] == name, "discord_id"]) == 0:
         await ctx.reply(f":exclamation:No character named `{name}` was found.")
@@ -333,7 +341,7 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 @commands.has_role("officer")
 async def promote(ctx, name):
 
-    name = titlecase(name)
+    name = name.capitalize()
     census = pd.read_sql_query('SELECT * FROM census', con)
     dkp = pd.read_sql_query('SELECT * FROM dkp', con)
     discord_id = census.loc[census["name"] == name, "discord_id"].item()
@@ -362,7 +370,7 @@ async def assign(ctx, toon, level: int, player_class, user_name):
 @client.command()
 async def main(ctx, toon, level: int = None, player_class: str = None):
 
-    toon = titlecase(toon)
+    toon = toon.capitalize()
 
     census = pd.read_sql_query('SELECT * FROM census', con)
 
@@ -596,10 +604,6 @@ async def dkp(ctx, toon=None):
         await ctx.reply(f":question:No census entry was not found. Check `!toons` and ensure one toon is declared as main, using `!main`.")
 
 
-
-
-
-
 @client.command()
 @commands.has_role("officer")
 async def logs(ctx, *, args):
@@ -635,7 +639,15 @@ async def logs(ctx, *, args):
     seen_players = []
     rejected = []
 
-    records = args.splitlines()[1:]
+    # if this is a reply to a message
+    is_reply = check_reply(ctx)
+    if is_reply == True:
+        message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        args = message.content
+
+    # records = args.splitlines()[1:]
+    records = args.splitlines()
+
     for record in records:
         # if the record doesn't contain the line "<Ex Astra>", move on
         # very important in case the line is blank
@@ -647,6 +659,9 @@ async def logs(ctx, *, args):
 
         if ("<" not in record or ">" not in record) and "ANONYMOUS" not in record:
             continue
+
+        record = re.sub(" AFK ", "", record)
+        record = re.sub(" LFG", "", record)
 
         line = re.compile("(%s|%s|%s|%s)" %
                           (re1, re2, re3, re4)).findall(record)
@@ -719,10 +734,19 @@ async def logs(ctx, *, args):
 
     if len(seen_players) > 0:
         await ctx.reply(f":dragon:{', '.join(seen_players)} earned `{modifier}` DKP for `{raid}` this hour.")
+        await ctx.message.add_reaction("✅")
+
+        if is_reply:
+            await message.add_reaction("✅")
+
 
     if len(rejected) > 0:
         sep = "\n"
-        await ctx.reply(f":question:Some logs got rejected. If you feel generous, after these people register, try:```!logs {raid}\n{sep.join(rejected)}```")
+        await ctx.reply(f":question:Some logs got rejected, since these players are not registered. ```\n{sep.join(rejected)}\n```")
+        await ctx.message.add_reaction("❌")
+
+        if is_reply:
+            await message.add_reaction("❌")
 
 
 @client.command()
@@ -798,7 +822,7 @@ async def rap(ctx, toon=None):
 
     rap_totals = pd.read_html('rap.html')
     rap_totals = rap_totals[len(rap_totals) - 1][['Name', 'Unnamed: 7']]
-    rap_totals['Name'] = rap_totals['Name'].apply(titlecase)
+    rap_totals['Name'] = rap_totals['Name'].str.capitalize()
     rap_totals.columns = ['Name', 'RAP']
 
     if toon == None:
@@ -821,7 +845,7 @@ async def rap(ctx, toon=None):
 
     rap_list = discord.Embed(
         title=f":dragon:RAP for `{user_name}`",
-        description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations.\nRAP may be inconsistent between toons, depending on\n player discrepancies between Ex Astra and AEGIS.",
+        description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations. RAP may be inconsistent between toons, depending on player discrepancies between Ex Astra and AEGIS. Also note, Ex Astra does not have control over RAP totals, this is just a snapshot of the website data, which is frequently unresponsive.",
         colour=discord.Colour.from_rgb(241, 196, 15))
 
     rap_list.add_field(
@@ -886,6 +910,7 @@ async def bank(ctx):
 @client.command()
 async def find(ctx, *, name):
 
+    original_name = name
     name = titlecase(name)
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -904,9 +929,10 @@ async def find(ctx, *, name):
 
     unique_bankers = search_results["banker"].unique()
 
+
     if len(unique_bankers) == 0:
 
-        await ctx.reply(f"None of the bankers currently have `{name}`.")
+        await ctx.reply(f"None of the bankers currently have `{original_name}`.")
 
     else:
         for i in unique_bankers:
@@ -1130,5 +1156,15 @@ async def on_command_error(ctx, error):
         return
 
     raise error
+
+@client.command()
+async def foo(ctx):
+
+    check = check_reply(ctx)
+    if check == True:
+        message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
+        await ctx.reply(f"`{message.content}`")
+    else:
+        await ctx.send("Not a reply!")
 
 client.run(config.token)
