@@ -111,7 +111,7 @@ async def ping(ctx):
     await ctx.reply(":ping_pong: time is `%.01f seconds`" % ping)
 
 @client.command()
-@commands.has_role("lootmaster")
+@commands.has_role("Lootmaster")
 async def deduct(ctx, amount: int, name, *, args):
     census = pd.read_sql_query('SELECT * FROM census', con)
     dkp = pd.read_sql_query('SELECT * FROM dkp', con)
@@ -162,7 +162,7 @@ async def deduct(ctx, amount: int, name, *, args):
 ################################################################################
 
 @client.command()
-@commands.has_any_role('officer', 'probationary officer', 'lootmaster')
+@commands.has_any_role('Officer', 'Probationary Officer', 'Lootmaster')
 async def award(ctx, amount: int, name, *, args):
     census = pd.read_sql_query('SELECT * FROM census', con)
 
@@ -338,7 +338,7 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 
 
 @client.command()
-@commands.has_role("officer")
+@commands.has_role("Officer")
 async def promote(ctx, name):
 
     name = name.capitalize()
@@ -361,7 +361,7 @@ async def promote(ctx, name):
     await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
 
 @client.command()
-@commands.has_role("officer")
+@commands.has_role("Officer")
 async def assign(ctx, toon, level: int, player_class, user_name):
 
     await declare_toon(ctx, "None", toon, level, player_class, user_name)
@@ -605,7 +605,7 @@ async def dkp(ctx, toon=None):
 
 
 @client.command()
-@commands.has_role("officer")
+@commands.has_role("Officer")
 async def logs(ctx, *, args):
 
     census = pd.read_sql_query('SELECT * FROM census', con)
@@ -662,6 +662,8 @@ async def logs(ctx, *, args):
 
         record = re.sub(" AFK ", "", record)
         record = re.sub(" LFG", "", record)
+        record = re.sub(" <LINKDEAD>", "", record)
+
 
         line = re.compile("(%s|%s|%s|%s)" %
                           (re1, re2, re3, re4)).findall(record)
@@ -742,7 +744,12 @@ async def logs(ctx, *, args):
 
     if len(rejected) > 0:
         sep = "\n"
-        await ctx.reply(f":question:Some logs got rejected, since these players are not registered. ```\n{sep.join(rejected)}\n```")
+
+        rejected = sep.join(rejected)
+        rejected = re.sub("```", "", rejected)
+        # get rid of the extra triple backticks
+
+        await ctx.reply(f":question:Some logs got rejected, since these players are not registered. ```\n{rejected}\n```")
         await ctx.message.add_reaction("❌")
 
         if is_reply:
@@ -750,7 +757,7 @@ async def logs(ctx, *, args):
 
 
 @client.command()
-@commands.has_role("officer")
+@commands.has_role("Officer")
 async def welcome(ctx):
 
     embed = discord.Embed(
@@ -845,12 +852,12 @@ async def rap(ctx, toon=None):
 
     rap_list = discord.Embed(
         title=f":dragon:RAP for `{user_name}`",
-        description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations. RAP may be inconsistent between toons, depending on player discrepancies between Ex Astra and AEGIS. Also note, Ex Astra does not have control over RAP totals, this is just a snapshot of the website data, which is frequently unresponsive.",
+        description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations. RAP may be inconsistent between, depending on your character declarations. Ex Astra does not have control over RAP totals.",
         colour=discord.Colour.from_rgb(241, 196, 15))
 
     rap_list.add_field(
         name="Character Declaration",
-        value=f"{len(rap_totals)} linked character(s) with RAP are declared in AEGIS.",
+        value=f"{len(rap_totals)} linked main character(s) with RAP are declared in AEGIS.",
         inline=False)
 
     if len(rap_totals) > 0:
@@ -870,7 +877,7 @@ async def rap(ctx, toon=None):
 
 
 @client.command()
-@commands.has_role("treasurer")
+@commands.has_role("Treasurer")
 async def bank(ctx):
 
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -972,7 +979,7 @@ async def find(ctx, *, name):
 
 
 @client.command()
-@commands.has_role("treasurer")
+@commands.has_role("Treasurer")
 async def banktotals(ctx):
 
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
@@ -1046,7 +1053,6 @@ async def dkphistory(ctx):
 
 
 @client.command()
-# @commands.has_role("treasurer")
 async def who(ctx, level: int = None, player_class: str = None):
 
     Base = automap_base()
@@ -1156,6 +1162,40 @@ async def on_command_error(ctx, error):
         return
 
     raise error
+
+@client.command()
+async def raid_roles(ctx, toon=None):
+
+    engine      = sqlalchemy.create_engine(config.db_url, echo=False)
+    census      = pd.read_sql_table("census", con=engine)
+    class_roles = pd.read_sql_table("class_roles", con=engine)
+    census      = pd.merge(census, class_roles, on = "character_class")
+
+
+    if toon == None:
+        discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+        toons = census.loc[census["discord_id"] == str(discord_id)]
+
+    else:
+        toon_ids = census.loc[census["name"] == toon.capitalize()]
+        discord_id = toon_ids['discord_id'].item()
+        toons    = census.loc[census["discord_id"].isin((toon_ids['discord_id']))]
+
+    member = await ctx.guild.fetch_member(discord_id)
+
+
+    raid_toons = toons[toons['level'] > 45]
+    raid_roles = raid_toons["role_id"].to_list()
+    raid_roles = list(set(raid_roles))
+
+    for role in raid_roles:
+
+        this_role = ctx.guild.get_role(role)
+        await member.add_roles(this_role)
+
+    await ctx.reply(f":white_check_mark:<@{discord_id}> now has `{len(raid_roles)}` raid roles.")
+
+
 
 @client.command()
 async def foo(ctx):
