@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # Imports
+import contextlib
 from sqlalchemy import create_engine
 import config
 import datetime
@@ -111,6 +112,18 @@ async def ping(ctx):
     await ctx.reply(":ping_pong: time is `%.01f seconds`" % ping)
 
 @client.command()
+async def apply(ctx):
+
+    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+    channel = client.get_channel(988260644056879194)  # census chat
+    member = await ctx.guild.fetch_member(discord_id)
+    applicant_role = ctx.guild.get_role(990817141831901234)  # come back to this
+
+    await member.add_roles(applicant_role)
+
+    await ctx.reply(f"Attention <@&849337092324327454> and <@&906952889287708773>, <@{discord_id}>, has submitted an application.")
+
+@client.command()
 @commands.has_role("Lootmaster")
 async def deduct(ctx, amount: int, name, *, args):
     census = pd.read_sql_query('SELECT * FROM census', con)
@@ -209,6 +222,11 @@ async def award(ctx, amount: int, name, *, args):
 
 ########################################################################################################
 async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None):
+    if ctx.channel.id != 851549677815070751 and ctx.channel.id != 1010546067479220316 and ctx.channel.id != 1011417799442309233 and ctx.channel.id != 851612545470693377:
+        await ctx.reply("This command can only be performed on <#851549677815070751>.")
+        raise CensusError('Someone tried to declare a toon that was not on the census channel.')
+
+
     census = pd.read_sql_query('SELECT * FROM census', con)
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     discord_id = ctx.message.guild.get_member_named(user_name).id
@@ -243,9 +261,11 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
 
             member = ctx.message.guild.get_member_named(user_name)
 
-            role = ctx.guild.get_role(884172643702546473)  # come back to this
+            approved_role = ctx.guild.get_role(1001891874161823884)
+            await member.remove_roles(approved_role)
 
-            await member.add_roles(role)
+            probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
+            await member.add_roles(probationary_role)
 
             formatted_id = f'<@{discord_id}>'
 
@@ -426,6 +446,22 @@ async def drop(ctx, toon, level: int = None, player_class: str = None):
     else:
         await declare_toon(ctx, "Dropped", toon, level, player_class, user_name)
 
+@client.command()
+@commands.has_role("Officer")
+async def purge(ctx, toon):
+    cur.execute("SELECT discord_id FROM census WHERE name = ?;", (toon.capitalize(),))
+    rows = cur.fetchall()
+    if len(rows) == 0:
+        await ctx.reply(f":warning: No character named `{toon.capitalize()}` found in the census.")
+        return
+    discord_id = rows[0][0]
+    cur.execute("SELECT DISTINCT name FROM census WHERE discord_id = ?;", (discord_id,))
+    all_toons = cur.fetchall()
+    for row in all_toons:
+        toon_name = row[0]
+        await drop(ctx, toon_name)
+    await ctx.reply(f":white_check_mark: All toons associated with `{toon.capitalize()}` have been purged.")
+
 
 @client.command()
 async def level(ctx, toon, level):
@@ -451,157 +487,142 @@ async def level(ctx, toon, level):
         await ctx.reply(f":question:`{toon.capitalize()}` corresponds to more than one character. Please ask Rahmani for help. `Error 5`")
 
 
-@client.command()
-async def toons(ctx, toon=None):
+async def get_toons_data(discord_id, toon=None):
+    engine = sqlalchemy.create_engine(config.db_url, echo=False)
+    try:
+        dkp = pd.read_sql_table("dkp", con=engine)
+        census = pd.read_sql_table("census", con=engine)
+    except sqlalchemy.exc.NoSuchTableError:
+        return None, ":x: The required tables are not present in the database."
+    finally:
+        engine.dispose()
 
-    engine     = sqlalchemy.create_engine(config.db_url, echo=False)
-    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
-    dkp        = pd.read_sql_table("dkp", con=engine)
-    census     = pd.read_sql_table("census", con=engine)
-
-    if toon == None:
+    if toon is None:
         toons = census.loc[census["discord_id"] == str(discord_id)]
-
     else:
         toon_ids = census.loc[census["name"] == toon.capitalize()]
-        toons    = census.loc[census["discord_id"].isin((toon_ids['discord_id']))]
+        toons = census.loc[census["discord_id"].isin((toon_ids['discord_id']))]
+        discord_id = toons['discord_id'].iloc[0] if not toons.empty else None
 
-    col_names  = toons.columns
+    return discord_id, toons
+
+def create_toons_embed(owner, toons):
     main_toons = toons[toons['status'] == "Main"]
-    alt_toons  = toons[toons['status'] == "Alt"]
-    bot_toons  = toons[toons['status'] == "Bot"]
+    alt_toons = toons[toons['status'] == "Alt"]
+    bot_toons = toons[toons['status'] == "Bot"]
 
     toons_list = discord.Embed(
-        title=f":book:Census data entry",
+        title=f":book:Census data entry for {owner.display_name if owner else 'Unknown User'}",
         description="DKP can be spent on all toons,\nbut only earned on toons over 45.",
         colour=discord.Colour.from_rgb(241, 196, 15))
 
-    if len(main_toons) > 0:
-        toons_list.add_field(
-            name="Main",
-            # value=f"{len(main_toons)} character(s) declared as mains",
-            value=f"Character declared as main",
-            inline=False)
+    def add_toons_to_embed(embed, toons, status):
+        if len(toons) > 0:
+            embed.add_field(
+                name=status,
+                value=f"{len(toons)} character(s) declared as {status.lower()}s",
+                inline=False)
 
-        toons_list.add_field(
-            name=":bust_in_silhouette: Name",
-            value=main_toons.name.to_string(index=False),
-            inline=True)
+            embed.add_field(
+                name=":bust_in_silhouette: Name",
+                value="```\n" + "\n".join(toons.name.tolist()) + "\n```",
+                inline=True)
 
-        toons_list.add_field(
-            name=":crossed_swords:️ Class",
-            value=main_toons.character_class.to_string(index=False),
-            inline=True)
+            embed.add_field(
+                name=":crossed_swords:️ Class",
+                value="```\n" + "\n".join(toons.character_class.tolist()) + "\n```",
+                inline=True)
 
-        toons_list.add_field(
-            name=":arrow_double_up: Level",
-            value=main_toons.level.to_string(
-                index=False),
-            inline=True)
+            embed.add_field(
+                name=":arrow_double_up: Level",
+                value="```\n" + "\n".join(map(str, toons.level.tolist())) + "\n```",
+                inline=True)
 
-    if len(alt_toons) > 0:
 
-        toons_list.add_field(
-            name="Alts",
-            value=f"{len(alt_toons)} character(s) declared as alts",
-            inline=False)
-
-        toons_list.add_field(
-            name=":bust_in_silhouette: Name",
-            value=alt_toons.name.to_string(index=False), inline=True)
-
-        toons_list.add_field(
-            name=":crossed_swords:️ Class",
-            value=alt_toons.character_class.to_string(index=False), inline=True)
-
-        toons_list.add_field(
-            name=":arrow_double_up: Level",
-            value=alt_toons.level.to_string(index=False),
-            inline=True)
-
-    if len(bot_toons) > 0:
-
-        toons_list.add_field(
-            name="Bots",
-            value=f"{len(bot_toons)} character(s) declared as bots",
-            inline=False)
-
-        toons_list.add_field(
-            name=":bust_in_silhouette: Name",
-            value=bot_toons.name.to_string(index=False), inline=True)
-
-        toons_list.add_field(
-            name=":crossed_swords:️ Class",
-            value=bot_toons.character_class.to_string(index=False), inline=True)
-
-        toons_list.add_field(
-            name=":arrow_double_up: Level",
-            value=bot_toons.level.to_string(index=False),
-            inline=True)
+    add_toons_to_embed(toons_list, main_toons, "Main")
+    add_toons_to_embed(toons_list, alt_toons, "Alt")
+    add_toons_to_embed(toons_list, bot_toons, "Bot")
 
     toons_list.set_footer(text="Fetched at local time")
-
     toons_list.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
 
-    await ctx.reply(embed=toons_list)
+    return toons_list
 
+@client.command()
+async def toons(ctx, toon=None):
+    try:
+        discord_id, toons = await get_toons_data(ctx.author.id, toon)
+
+        if toons is None:
+            await ctx.reply(content=":x: The required tables are not present in the database.")
+            return
+
+        owner = ctx.guild.get_member(int(discord_id)) if discord_id is not None else None
+        toons_list = create_toons_embed(owner, toons)
+
+        if owner is not None:
+            await ctx.reply(content=f":mag: {owner.mention}'s toons include:", embed=toons_list)
+        else:
+            await ctx.reply(content=":warning: User not found. Please check the toon name and try again.", embed=toons_list)
+    except Exception as e:
+        await ctx.reply(content=f":x: An error occurred: {str(e)}")
+
+async def get_dkp_data(discord_id, toon=None):
+    engine = sqlalchemy.create_engine(config.db_url, echo=False)
+    dkp = pd.read_sql_table("dkp", con=engine)
+    census = pd.read_sql_table("census", con=engine)
+
+    if toon is None:
+        dkp_mains = census[(census.status == 'Main') & (census.discord_id == discord_id)][['discord_id', 'name']]
+    else:
+        toon = toon.capitalize()
+        dkp_mains = census[(census.status == 'Main') & (census.name == toon)][['discord_id', 'name']]
+        discord_id = dkp_mains['discord_id'].iloc[0] if not dkp_mains.empty else None
+
+    dkp_dict = dkp.merge(dkp_mains, how='inner', on='discord_id')
+    dkp_dict["current_dkp"] = dkp_dict["earned_dkp"] - dkp_dict["spent_dkp"]
+
+    return discord_id, dkp_dict
+
+
+def create_dkp_embed(user, dkp_dict):
+    embed = discord.Embed(
+        title=f":dragon: DKP for `{user.display_name if user else 'Unknown User'}`",
+        description="DKP can be spent on all toons, but only earned on toons over 45.",
+        colour=discord.Colour.from_rgb(241, 196, 15))
+
+    embed.add_field(
+        name=":bust_in_silhouette:️ Main Toon",
+        value=f"```\n{dkp_dict['name'].to_string(index=False).strip()}\n```",
+        inline=True)
+
+    embed.add_field(
+        name=":arrow_up:️ Current DKP",
+        value=f"```\n{dkp_dict['current_dkp'].to_string(index=False).strip()}\n```",
+        inline=True)
+
+    embed.add_field(
+        name=":moneybag: Total Earned",
+        value=f"```\n{dkp_dict['earned_dkp'].to_string(index=False).strip()}\n```",
+        inline=True)
+
+    embed.set_footer(
+        text="Fetched at local time")
+
+    embed.timestamp = datetime.datetime.now(pytz.timezone("US/Pacific"))
+
+    return embed
 
 @client.command()
 async def dkp(ctx, toon=None):
+    discord_id, dkp_dict = await get_dkp_data(str(ctx.message.guild.get_member_named(str(ctx.author)).id), toon)
 
-    engine     = sqlalchemy.create_engine(config.db_url, echo=False)
-    discord_id = format(ctx.message.guild.get_member_named(format(ctx.author)).id)
-    dkp        = pd.read_sql_table("dkp", con=engine)
-    census     = pd.read_sql_table("census", con=engine)
-
-    if toon == None:
-        user = format(ctx.author)
-
-        dkp_mains = census[('Main' == census.status) & (census.discord_id.isin(census[census.discord_id == discord_id]['discord_id']))][['discord_id', 'name']]
-
+    if not dkp_dict.empty:
+        user = ctx.guild.get_member(int(discord_id)) if discord_id is not None else None
+        dkp_embed = create_dkp_embed(user, dkp_dict)
+        await ctx.reply(content=f":mag: {user.mention}'s DKP:", embed=dkp_embed)
     else:
-        user = toon.capitalize()
-
-        dkp_mains = census[('Main' == census.status) & (census.discord_id.isin(census[census.name == toon.capitalize()]['discord_id']))][['discord_id', 'name']]
-
-    dkp_dict = dkp.merge(dkp_mains, how = 'inner', on = 'discord_id')
-
-    dkp_dict["current_dkp"] = dkp_dict["earned_dkp"] - dkp_dict["spent_dkp"]
-
-    rows = len(dkp_dict)
-
-    if rows == 1:
-
-        embed = discord.Embed(
-            title=f":dragon:DKP for `{user}`",
-            description="DKP can be spent on all toons, but only earned on toons over 45.",
-            colour=discord.Colour.from_rgb(241, 196, 15))
-
-        embed.add_field(
-            name=":bust_in_silhouette:️ Main Toon",
-            value=dkp_dict["name"].to_string(index=False),
-            inline=True)
-
-        embed.add_field(
-            name=":arrow_up:️ Current DKP",
-            value=dkp_dict["current_dkp"].to_string(index=False),
-            inline=True)
-
-        embed.add_field(
-            name=":moneybag: Total Earned",
-            value=dkp_dict["earned_dkp"].to_string(index=False),
-            inline=True)
-
-        embed.set_footer(
-            text="Fetched at local time")
-
-        embed.timestamp = datetime.datetime.now(pytz.timezone("US/Pacific"))
-
-        await ctx.reply(embed=embed)
-
-    else:
-        # await ctx.reply(f":question:{format(ctx.author.mention)}, No DKP found for `{user}`. Ensure the character is created and over level 45. \nSee `!help toons`, `!help main`, and `!help level`")
-        await ctx.reply(f":question:No census entry was not found. Check `!toons` and ensure one toon is declared as main, using `!main`.")
+        await ctx.reply(content=":question: No census entry was found. Check `!toons` and ensure one toon is declared as main, using `!main`.")
 
 
 @client.command()
@@ -765,44 +786,50 @@ async def welcome(ctx):
         description=":wave:We’re glad to have you. ")
 
     embed.add_field(
-        name=":one:",
-        value="Declare your mains on the <#851549677815070751> here, on the Ex Astra server. \n Some useful commands include: `!main <character name> <level> <class>`, `!toons`, `!dkp`",
+        name=":one: Fill out a guild application",
+        value="<#988260644056879194>\nAfter filling out an application ([click here](https://discord.com/channels/838976035575562293/988260644056879194/988260816144973835), type `!apply` (and nothing else) in a new message to formally submit your application.\n Once and if you are approved, you may move onto the next steps.",
         inline=False)
 
     embed.add_field(
-        name=":two:",
-        value="Join the Aegis Alliance Server invite below and introduce yourself here:\n <#465750297336086530> (link will be usable once you join the invite below)",
+        name=":two: Declare your main",
+        value="<#851549677815070751>\n Some useful commands include: `!main <character name> <level> <class>`, `!toons`, `!dkp`",
         inline=False)
 
     embed.add_field(
-        name=":three:",
-        value="Register your toon on [Aegis Website](https://aegisrap.com).\nThis is how you'll be able to keep track of your RAP (Raid Attendance Points) for Aegis Alliance Raids.",
+        name=":three: Join the Aegis Alliance Server",
+        value="[Aegis Discord](https://discord.gg/CS2j2KJYPC)",
         inline=False)
 
     embed.add_field(
-        name=":four:",
-        value=" Have a question?\n :man_raising_hand:Write it in the <#864599563204296724> channel!",
+        name=":four: Register on Aegis Webiste",
+        value="[Aegis Website](https://aegisrap.com).\nThis is how you'll be able to keep track of your RAP (Raid Attendance Points) for Aegis Alliance Raids.",
         inline=False)
 
     embed.add_field(
-        name=":five:",
-        value="Need to talk to an officer? Tag an officer using <@&wait> in the <#838976036167090247> or other text channels.",
+        name=":five: Have a question?",
+        value=":man_raising_hand:Write it in the <#864599563204296724> channel!",
         inline=False)
 
     embed.add_field(
-        name=":six:",
-        value="Check our <#870938136472088586>, <#851872447057100840>, and <#856424309026979870> channels for upcoming events",
+        name=":six: Need to talk to an officer?",
+        value="Tag an officer using <@&849337092324327454> in the <#838976036167090247> or other text channels.",
         inline=False)
 
     embed.add_field(
-        name=":seven:",
+        name=":seven: Events",
+        value="<#870938136472088586>, <#851872447057100840>, and <#856424309026979870> channels for upcoming events",
+        inline=False)
+
+    embed.add_field(
+        name=":eight: Epics",
         value="Check our <#851834766302249020> channel if you need assistance with your epic",
         inline=False)
 
     await ctx.send(embed=embed)
 
+
 @client.command()
-async def rap(ctx, toon=None):
+async def sanctum(ctx, toon=None):
 
     import os
     st = os.stat('rap.html')
@@ -828,7 +855,9 @@ async def rap(ctx, toon=None):
     census = pd.read_sql_query('SELECT * FROM census', con)
 
     rap_totals = pd.read_html('rap.html')
-    rap_totals = rap_totals[len(rap_totals) - 1][['Name', 'Unnamed: 7']]
+
+    rap_totals = rap_totals[16][['Name', 'Unnamed: 6']]
+    print(rap_totals.to_string())
     rap_totals['Name'] = rap_totals['Name'].str.capitalize()
     rap_totals.columns = ['Name', 'RAP']
 
@@ -851,25 +880,25 @@ async def rap(ctx, toon=None):
     rap_totals = inner_merged.loc[inner_merged['discord_id'] == discord_id]
 
     rap_list = discord.Embed(
-        title=f":dragon:RAP for `{user_name}`",
-        description="Consult the [Aegis Website](https://aegisrap.com) for rules and declarations. RAP may be inconsistent between, depending on your character declarations. Ex Astra does not have control over RAP totals.",
+        title=f":dragon:Sanctum DKP for `{user_name}`",
+        description="Consult the [Sanctum Website](https://p99sanctum.com) for rules and declarations. Sanctum DKP may be inconsistent between, depending on your character declarations. Ex Astra does not have control over Sanctum DKP.",
         colour=discord.Colour.from_rgb(241, 196, 15))
 
     rap_list.add_field(
         name="Character Declaration",
-        value=f"{len(rap_totals)} linked main character(s) with RAP are declared in AEGIS.",
+        value=f"{len(rap_totals)} linked main character(s) with DKP are declared in Sanctum.",
         inline=False)
 
     if len(rap_totals) > 0:
-
         rap_list.add_field(
             name=":bust_in_silhouette: Name",
-            value=rap_totals.name.to_string(index=False),
+            value="```\n" + "\n".join(rap_totals.name.tolist()) + "\n```",
             inline=True)
 
         rap_list.add_field(
-            name=":arrow_up:️ Current RAP",
-            value=rap_totals.RAP.to_string(index=False), inline=True)
+            name=":arrow_up:️ Current Sanctum DKP",
+            value="```\n" + "\n".join(map(str, rap_totals.RAP.tolist())) + "\n```",
+            inline=True)
 
     rap_list.set_footer(text=RAP_age)
 
@@ -913,69 +942,64 @@ async def bank(ctx):
 
     inventory.to_sql("bank", engine, if_exists="append", index=False)
 
-
-@client.command()
-async def find(ctx, *, name):
-
-    original_name = name
-    name = titlecase(name)
-
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
+async def fetch_bank_items(name):
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
     bank = pd.read_sql_table("bank", con=engine)
     trash = pd.read_sql_table("trash", con=engine)
     bank = bank[~bank['name'].isin(trash['name'])]
 
     bank["name"] = bank["name"].apply(titlecase)
-
     bank["name"] = bank["name"].str.replace("`", "'")
 
-    search_results = bank[bank["name"].str.contains(
-        name)][["banker", "name", "location", "quantity", "time"]]
+    return bank[bank["name"].str.contains(name)][["banker", "name", "location", "quantity", "time"]]
 
-    unique_bankers = search_results["banker"].unique()
+def build_search_embed(name, banker, banker_results):
+    search_embed = discord.Embed(
+        title=f":gem: Treasury Query for `{name}`",
+        description=f"Found on `{banker}`",
+        colour=discord.Colour.from_rgb(241, 196, 15))
 
+    search_embed.add_field(
+        name="Item Characteristics",
+        value=f"{len(banker_results)} matching item(s) found.",
+        inline=False)
 
-    if len(unique_bankers) == 0:
+    search_embed.add_field(
+        name=":bust_in_silhouette: Item",
+        value="```\n" + "\n".join(banker_results.name.tolist()) + "\n```",
+        inline=True)
 
-        await ctx.reply(f"None of the bankers currently have `{original_name}`.")
+    search_embed.add_field(
+        name=":question: Location",
+        value="```\n" + "\n".join(banker_results.location.tolist()) + "\n```",
+        inline=True)
 
-    else:
-        for i in unique_bankers:
+    search_embed.add_field(
+        name=":arrow_up:️ Quantity",
+        value="```\n" + "\n".join(map(str, banker_results.quantity.tolist())) + "\n```",
+        inline=True)
 
-            banker_results = search_results.loc[search_results["banker"] == i]
+    search_embed.set_footer(text="Fetched at local time")
+    search_embed.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
 
-            search_embed = discord.Embed(
-                title=f":gem: Treasury Query for `{name}`",
-                description=f"Found on `{i}`",
-                colour=discord.Colour.from_rgb(241, 196, 15))
+    return search_embed
 
-            search_embed.add_field(
-                name="Item Characteristics",
-                value=f"{len(banker_results)} matching item(s) found.",
-                inline=False)
+@client.command()
+async def find(ctx, *, name):
+    try:
+        original_name = titlecase(name)
+        search_results = await fetch_bank_items(original_name)
 
-            search_embed.add_field(
-                name=":bust_in_silhouette: Item",
-                value=banker_results.name.to_string(index=False),
-                inline=True)
-
-            search_embed.add_field(
-                name=":question: Location",
-                value=banker_results.location.to_string(index=False),
-                inline=True)
-
-            search_embed.add_field(
-                name=":arrow_up:️ Quantity",
-                value=banker_results.quantity.to_string(index=False), inline=True)
-
-            search_embed.set_footer(text="Fetched at local time")
-
-            search_embed.timestamp = datetime.datetime.now(
-                pytz.timezone('US/Pacific'))
-
-            await ctx.reply(embed=search_embed)
+        if search_results.empty:
+            await ctx.reply(f"None of the bankers currently have `{original_name}`.")
+        else:
+            unique_bankers = search_results["banker"].unique()
+            for i in unique_bankers:
+                banker_results = search_results.loc[search_results["banker"] == i]
+                search_embed = build_search_embed(original_name, i, banker_results)
+                await ctx.reply(embed=search_embed)
+    except Exception as e:
+        await ctx.reply(content=f":x: An error occurred: {str(e)}")
 
 
 @client.command()
@@ -1053,8 +1077,7 @@ async def dkphistory(ctx):
 
 
 @client.command()
-async def who(ctx, level: int = None, player_class: str = None):
-
+async def who(ctx, level, optional_max_level=None, player_class=None):
     Base = automap_base()
     engine = create_engine(config.db_url)
     Base.prepare(engine, reflect=True)
@@ -1064,7 +1087,36 @@ async def who(ctx, level: int = None, player_class: str = None):
 
     session = Session(engine)
 
-    if (level == None or level < 1 or level > 60):
+    if player_class is None:  # 2 arguments
+        try:
+            level = int(level)
+        except ValueError:
+            await ctx.reply(f"{level} is not a valid level.")
+            return
+
+        player_class = optional_max_level
+        max_level = level
+
+    else:  # 3 arguments
+        try:
+            level = int(level)
+        except ValueError:
+            await ctx.reply(f"{level} is not a valid level.")
+            return
+
+        try:
+            max_level = int(optional_max_level)
+        except ValueError:
+            await ctx.reply(f"{optional_max_level} is not a valid level.")
+            return
+
+        if level > max_level:
+            await ctx.reply("Invalid level range.")
+            return
+
+        player_class = player_class
+
+    if level < 1 or level > 60:
         await ctx.reply("You think you're funny, huh?")
         return
 
@@ -1075,31 +1127,62 @@ async def who(ctx, level: int = None, player_class: str = None):
 
     toon_q = session.query(Census).\
         filter(Census.character_class == player_class).\
-        filter(Census.level == level).\
+        filter(Census.level >= level).\
+        filter(Census.level <= max_level).\
         filter(Census.status != "Dropped").\
         join(Attendance, Attendance.discord_id == Census.discord_id).\
         having(func.max(Attendance.date)).group_by(Attendance.discord_id).\
         order_by(Attendance.date.desc())
 
-    # att_q = session.query(Attendance).having(func.max(Attendance.Date)).group_by(Attendance.ID)
-
-    matching_toons = pd.read_sql(toon_q.statement, toon_q.session.bind)[['name', 'discord_id']]
+    matching_toons = pd.read_sql(toon_q.statement, toon_q.session.bind)[['name', 'discord_id', 'level']]
 
     if len(matching_toons) == 0:
-
-        await ctx.reply(f"There were no level {level} {player_class}s found.")
-
+        if max_level == level:
+            await ctx.reply(f"There were no level {level} {player_class}s found.")
+        else:
+            await ctx.reply(f"There were no level {level} to {max_level} {player_class}s found.")
     else:
-        #formatting to make things pretty print in Discord
-        matching_toons['name'] = "`" + matching_toons['name']
-        matching_toons['discord_id'] = "`<@" + matching_toons['discord_id'] + ">"
-        matching_toons = tabulate(matching_toons, headers="keys", showindex=False, tablefmt="plain")
-        matching_toons = re.sub ("^(name.*)", r"`\1`", matching_toons)
-        matching_toons = f":white_check_mark:Registered level `{level}` `{player_class}s`, sorted by most recently earned DKP on any character.\n" + matching_toons
+        guild = ctx.guild
+        names = []
+        mentions = []
+        left_server_names = []
 
-        await ctx.reply(matching_toons)
+        for _, row in matching_toons.iterrows():
+            name = row["name"]
+            discord_id = row["discord_id"]
+            level = row["level"]
+            member = guild.get_member(int(discord_id))
 
-    return
+            if member is not None:
+                names.append(name)
+                if level == max_level or level == level:
+                    mentions.append((discord_id, level))
+                else:
+                    mentions.append((discord_id, f"{level}-{max_level}"))
+            else:
+                left_server_names.append(name)
+
+        embed = discord.Embed(
+            title=f":white_check_mark: Registered level {level} to {max_level} {player_class}s",
+            description="Sorted by most recently earned DKP on any character.",
+            colour=discord.Colour.from_rgb(241, 196, 15))
+
+        embed.add_field(
+            name=":bust_in_silhouette: Name",
+            value="".join([f"`{name}`\n" for name in names]),
+            inline=True)
+
+        embed.add_field(
+            name=":busts_in_silhouette: Discord",
+            value="".join([f"`{' ' if level < 10 else ''}{mention[1]}`<@{mention[0]}>\n" for mention in mentions]),
+            inline=True)
+
+        if left_server_names:
+            left_server_names_str = ", ".join(left_server_names)
+            embed.set_footer(text=f"The following characters appear not to belong to this server anymore:\n{left_server_names_str}")
+
+        await ctx.reply(embed=embed)
+
 
 @client.command()
 async def claim(ctx, toon):
@@ -1134,6 +1217,7 @@ async def claim(ctx, toon):
 
 
 @client.command()
+@commands.has_role("DUMMY")
 async def event(ctx):
     return
 
