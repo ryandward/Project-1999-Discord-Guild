@@ -221,8 +221,13 @@ async def award(ctx, amount: int, name, *, args):
         await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error -1`")
 
 ########################################################################################################
-async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None):
-    if ctx.channel.id != 851549677815070751 and ctx.channel.id != 1010546067479220316 and ctx.channel.id != 1011417799442309233 and ctx.channel.id != 851612545470693377:
+async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None, discord_id: str = None):
+    if discord_id is None:
+        discord_id = str(ctx.message.guild.get_member_named(user_name).id)
+    
+    allowed_channels = [851549677815070751, 862364645695422514]
+
+    if ctx.channel.id not in allowed_channels:
         await ctx.reply("This command can only be performed on <#851549677815070751>.")
         raise CensusError('Someone tried to declare a toon that was not on the census channel.')
 
@@ -382,9 +387,14 @@ async def promote(ctx, name):
 
 @client.command()
 @commands.has_role("Officer")
-async def assign(ctx, toon, level: int, player_class, user_name):
+async def assign(ctx, status, toon, level: int = None, player_class: str = None, user_id: int = None):
+    if user_id is None:
+        user_id = ctx.author.id
 
-    await declare_toon(ctx, "None", toon, level, player_class, user_name)
+    user_name = ctx.guild.get_member(user_id).display_name
+
+    await declare_toon(ctx, status, toon, level, player_class, user_name=user_name, discord_id=str(user_id))
+
 
 
 @client.command()
@@ -485,6 +495,29 @@ async def level(ctx, toon, level):
     if cur.rowcount > 1:
         con.rollback()
         await ctx.reply(f":question:`{toon.capitalize()}` corresponds to more than one character. Please ask Rahmani for help. `Error 5`")
+        
+
+@client.command()
+async def ding(ctx, toon):
+    try:
+        engine = sqlalchemy.create_engine(config.db_url, echo=False)
+        census = pd.read_sql_table("census", con=engine)
+        engine.dispose()
+
+        toon_data = census.loc[census["name"] == toon.capitalize()]
+
+        if toon_data.empty:
+            await ctx.reply(content=":x: The specified toon was not found.")
+            return
+
+        current_level = toon_data['level'].iloc[0]
+        new_level = current_level + 1
+
+        # Invoke the level command with the new level
+        await ctx.invoke(client.get_command('level'), toon=toon, level=str(new_level))
+
+    except Exception as e:
+        await ctx.reply(content=f":x: An error occurred: {str(e)}")
 
 
 async def get_toons_data(discord_id, toon=None):
@@ -573,16 +606,20 @@ async def get_dkp_data(discord_id, toon=None):
     census = pd.read_sql_table("census", con=engine)
 
     if toon is None:
-        dkp_mains = census[(census.status == 'Main') & (census.discord_id == discord_id)][['discord_id', 'name']]
+        dkp_mains = census[census.discord_id == discord_id][['discord_id', 'name']]
     else:
         toon = toon.capitalize()
-        dkp_mains = census[(census.status == 'Main') & (census.name == toon)][['discord_id', 'name']]
+        dkp_mains = census[census.name == toon][['discord_id', 'name']]
         discord_id = dkp_mains['discord_id'].iloc[0] if not dkp_mains.empty else None
 
-    dkp_dict = dkp.merge(dkp_mains, how='inner', on='discord_id')
+    # Look up the Main character associated with the found discord_id
+    main_character = census[(census.discord_id == discord_id) & (census.status == 'Main')][['discord_id', 'name']]
+    
+    dkp_dict = dkp.merge(main_character, how='inner', on='discord_id')
     dkp_dict["current_dkp"] = dkp_dict["earned_dkp"] - dkp_dict["spent_dkp"]
 
     return discord_id, dkp_dict
+
 
 
 def create_dkp_embed(user, dkp_dict):
@@ -590,11 +627,6 @@ def create_dkp_embed(user, dkp_dict):
         title=f":dragon: DKP for `{user.display_name if user else 'Unknown User'}`",
         description="DKP can be spent on all toons, but only earned on toons over 45.",
         colour=discord.Colour.from_rgb(241, 196, 15))
-
-    embed.add_field(
-        name=":bust_in_silhouette:️ Main Toon",
-        value=f"```\n{dkp_dict['name'].to_string(index=False).strip()}\n```",
-        inline=True)
 
     embed.add_field(
         name=":arrow_up:️ Current DKP",
@@ -622,7 +654,8 @@ async def dkp(ctx, toon=None):
         dkp_embed = create_dkp_embed(user, dkp_dict)
         await ctx.reply(content=f":mag: {user.mention}'s DKP:", embed=dkp_embed)
     else:
-        await ctx.reply(content=":question: No census entry was found. Check `!toons` and ensure one toon is declared as main, using `!main`.")
+        await ctx.reply(content=":question: No census entry was found. Check `!toons`.")
+
 
 
 @client.command()
@@ -951,7 +984,7 @@ async def fetch_bank_items(name):
     bank["name"] = bank["name"].apply(titlecase)
     bank["name"] = bank["name"].str.replace("`", "'")
 
-    return bank[bank["name"].str.contains(name)][["banker", "name", "location", "quantity", "time"]]
+    return bank[bank["name"].str.contains(name)][["id", "banker", "name", "location", "quantity", "time"]]
 
 def build_search_embed(name, banker, banker_results):
     search_embed = discord.Embed(
@@ -1075,55 +1108,53 @@ async def dkphistory(ctx):
     os.remove(dkp_file)
     return
 
-
 @client.command()
 async def who(ctx, level, optional_max_level=None, player_class=None):
+    level, max_level, player_class = validate_and_process_input(ctx, level, optional_max_level, player_class)
+    if level is None:
+        return
+    matching_toons = fetch_matching_toons(level, max_level, player_class)
+    if len(matching_toons) == 0:
+        await reply_no_matching_toon(ctx, level, max_level, player_class)
+    else:
+        await reply_matching_toons(ctx, matching_toons, level, max_level, player_class)
+
+def validate_and_process_input(ctx, level, optional_max_level, player_class):
+    try:
+        level = int(level)
+    except ValueError:
+        ctx.reply(f"{level} is not a valid level.")
+        return None, None, None
+
+    if player_class is None:  # Exact mode
+        max_level = level
+        player_class = optional_max_level
+    else:  # Range mode
+        try:
+            max_level = int(optional_max_level)
+        except ValueError:
+            ctx.reply(f"{optional_max_level} is not a valid level.")
+            return None, None, None
+
+        if level > max_level:
+            ctx.reply("Invalid level range.")
+            return None, None, None
+
+    if not 1 <= level <= 60:
+        ctx.reply("You think you're funny, huh?")
+        return None, None, None
+
+    return level, max_level, get_player_class(player_class) if player_class is not None else None
+
+def fetch_matching_toons(level, max_level, player_class):
     Base = automap_base()
     engine = create_engine(config.db_url)
     Base.prepare(engine, reflect=True)
 
-    Census = Base.classes.census
     Attendance = Base.classes.attendance
+    Census = Base.classes.census
 
     session = Session(engine)
-
-    if player_class is None:  # 2 arguments
-        try:
-            level = int(level)
-        except ValueError:
-            await ctx.reply(f"{level} is not a valid level.")
-            return
-
-        player_class = optional_max_level
-        max_level = level
-
-    else:  # 3 arguments
-        try:
-            level = int(level)
-        except ValueError:
-            await ctx.reply(f"{level} is not a valid level.")
-            return
-
-        try:
-            max_level = int(optional_max_level)
-        except ValueError:
-            await ctx.reply(f"{optional_max_level} is not a valid level.")
-            return
-
-        if level > max_level:
-            await ctx.reply("Invalid level range.")
-            return
-
-        player_class = player_class
-
-    if level < 1 or level > 60:
-        await ctx.reply("You think you're funny, huh?")
-        return
-
-    if player_class is not None:
-        player_class = get_player_class(player_class)
-
-    current_time = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
 
     toon_q = session.query(Census).\
         filter(Census.character_class == player_class).\
@@ -1134,54 +1165,55 @@ async def who(ctx, level, optional_max_level=None, player_class=None):
         having(func.max(Attendance.date)).group_by(Attendance.discord_id).\
         order_by(Attendance.date.desc())
 
-    matching_toons = pd.read_sql(toon_q.statement, toon_q.session.bind)[['name', 'discord_id', 'level']]
+    return pd.read_sql(toon_q.statement, toon_q.session.bind)[['name', 'discord_id', 'level']]
 
-    if len(matching_toons) == 0:
-        if max_level == level:
-            await ctx.reply(f"There were no level {level} {player_class}s found.")
-        else:
-            await ctx.reply(f"There were no level {level} to {max_level} {player_class}s found.")
+async def reply_no_matching_toon(ctx, level, max_level, player_class):
+    if max_level == level:
+        await ctx.reply(f"There were no level {level} {player_class}s found.")
     else:
-        guild = ctx.guild
-        names = []
-        mentions = []
-        left_server_names = []
+        await ctx.reply(f"There were no level {level} to {max_level} {player_class}s found.")
 
-        for _, row in matching_toons.iterrows():
-            name = row["name"]
-            discord_id = row["discord_id"]
-            level = row["level"]
-            member = guild.get_member(int(discord_id))
+async def reply_matching_toons(ctx, matching_toons, level, max_level, player_class):
+    guild = ctx.guild
+    names = []
+    mentions = []
+    left_server_names = []
 
-            if member is not None:
-                names.append(name)
-                if level == max_level or level == level:
-                    mentions.append((discord_id, level))
-                else:
-                    mentions.append((discord_id, f"{level}-{max_level}"))
+    for _, row in matching_toons.iterrows():
+        name = row["name"]
+        discord_id = row["discord_id"]
+        level = row["level"]
+        member = guild.get_member(int(discord_id))
+
+        if member is not None:
+            names.append(name)
+            if level == max_level or level == level:
+                mentions.append((discord_id, level))
             else:
-                left_server_names.append(name)
+                mentions.append((discord_id, f"{level}-{max_level}"))
+        else:
+            left_server_names.append(name)
 
-        embed = discord.Embed(
-            title=f":white_check_mark: Registered level {level} to {max_level} {player_class}s",
-            description="Sorted by most recently earned DKP on any character.",
-            colour=discord.Colour.from_rgb(241, 196, 15))
+    embed = discord.Embed(
+        title=f":white_check_mark: Registered level {level} to {max_level} {player_class}s",
+        description="Sorted by most recently earned DKP on any character.",
+        colour=discord.Colour.from_rgb(241, 196, 15))
 
-        embed.add_field(
-            name=":bust_in_silhouette: Name",
-            value="".join([f"`{name}`\n" for name in names]),
-            inline=True)
+    embed.add_field(
+        name=":bust_in_silhouette: Name",
+        value="".join([f"`{name}`\n" for name in names]),
+        inline=True)
 
-        embed.add_field(
-            name=":busts_in_silhouette: Discord",
-            value="".join([f"`{' ' if level < 10 else ''}{mention[1]}`<@{mention[0]}>\n" for mention in mentions]),
-            inline=True)
+    embed.add_field(
+        name=":busts_in_silhouette: Discord",
+        value="".join([f"`{' ' if level < 10 else ''}{mention[1]}`<@{mention[0]}>\n" for mention in mentions]),
+        inline=True)
 
-        if left_server_names:
-            left_server_names_str = ", ".join(left_server_names)
-            embed.set_footer(text=f"The following characters appear not to belong to this server anymore:\n{left_server_names_str}")
+    if left_server_names:
+        left_server_names_str = ", ".join(left_server_names)
+        embed.set_footer(text=f"The following characters appear not to belong to this server anymore:\n{left_server_names_str}")
 
-        await ctx.reply(embed=embed)
+    await ctx.reply(embed=embed)
 
 
 @client.command()
@@ -1280,15 +1312,128 @@ async def raid_roles(ctx, toon=None):
     await ctx.reply(f":white_check_mark:<@{discord_id}> now has `{len(raid_roles)}` raid roles.")
 
 
+###########
+
+async def remove_item_from_bank(id):
+    Base = automap_base()
+    engine = create_engine(config.db_url)
+    Base.prepare(engine, reflect=True)
+    Bank = Base.classes.bank
+    session = Session(engine)
+    
+    try:
+        item_to_delete = session.query(Bank).filter(Bank.id == int(id)).one()
+        session.delete(item_to_delete)
+        session.commit()
+        return True
+    except Exception as e:
+        print(f"Error removing item from bank: {e}")
+        return False
+
+
+import asyncio
+
+def build_sell_embed(name, banker, banker_results):
+    search_embed = discord.Embed(
+        title=f":gem: Treasury Query for `{name}`",
+        description=f"Found on `{banker}`",
+        colour=discord.Colour.from_rgb(241, 196, 15))
+
+    search_embed.add_field(
+        name="Item Characteristics",
+        value=f"{len(banker_results)} matching item(s) found.",
+        inline=False)
+
+  
+    search_embed.add_field(
+        name=":1234: ID",
+        value="```\n" + "\n".join(banker_results.id.astype(str).tolist()) + "\n```",
+        inline=True)
+
+    search_embed.add_field(
+        name=":bust_in_silhouette: Item",
+        value="```\n" + "\n".join(banker_results.name.tolist()) + "\n```",
+        inline=True)
+
+    search_embed.add_field(
+        name=":arrow_up:️ Quantity",
+        value="```\n" + "\n".join(map(str, banker_results.quantity.tolist())) + "\n```",
+        inline=True)
+
+    search_embed.set_footer(text="Fetched at local time")
+    search_embed.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
+
+    return search_embed
 
 @client.command()
-async def foo(ctx):
+async def sell2(ctx, *, name):
+    try:
+        original_name = titlecase(name)
+        search_results = await fetch_bank_items(original_name)
 
-    check = check_reply(ctx)
-    if check == True:
-        message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
-        await ctx.reply(f"`{message.content}`")
+        if search_results.empty:
+            await ctx.reply(f"None of the bankers currently have `{original_name}`.")
+        else:
+            unique_bankers = search_results["banker"].unique()
+            for i in unique_bankers:
+                banker_results = search_results.loc[search_results["banker"] == i]
+                search_embed = build_sell_embed(original_name, i, banker_results)
+                await ctx.reply(embed=search_embed)
+    except Exception as e:
+        await ctx.reply(content=f":x: An error occurred: {str(e)}")
+
+import re
+
+@client.command()
+@commands.has_role("Officer")
+async def sell(ctx, *, item_name):
+    global pending_sell
+
+    original_name = titlecase(item_name)
+    search_results = await fetch_bank_items(original_name)
+
+    if search_results.empty:
+        await ctx.reply(f"🚫 None of the bankers currently have `{original_name}`.")
     else:
-        await ctx.send("Not a reply!")
+        await ctx.reply("🔢 Please select the item IDs you've sold by entering the numbers.\nEnter `0` to cancel the operation.")
+        try:
+            if search_results.empty:
+                await ctx.reply(f"🚫 None of the bankers currently have `{original_name}`.")
+            else:
+                unique_bankers = search_results["banker"].unique()
+                for i in unique_bankers:
+                    banker_results = search_results.loc[search_results["banker"] == i]
+                    search_embed = build_sell_embed(original_name, i, banker_results)
+                    await ctx.reply(embed=search_embed)
+
+        except Exception as e:
+            await ctx.reply(content=f":x: An error occurred: {str(e)}")
+
+        def check(m):
+            return m.author == ctx.author and all(part.isdigit() for part in re.split('\W+', m.content))
+
+        try:
+            msg = await client.wait_for('message', check=check, timeout=60)
+            numbers = [int(part) for part in re.split('\W+', msg.content) if part.isdigit()]
+            if 0 in numbers:
+                await ctx.reply("❌ Operation canceled.")
+                return
+            successful_ids, failed_ids = [], []
+            for number in numbers:
+                remove_success = await remove_item_from_bank(number)
+                if remove_success:
+                    successful_ids.append("`" + str(number) + "`")
+                else:
+                    failed_ids.append("`" + str(number) + "`")
+            responses = []
+            if successful_ids:
+                responses.append(f"🔨 Item number(s) {', '.join(successful_ids)} sold!")
+            if failed_ids:
+                responses.append(f"🚫 There was a problem removing product ID(s): `{', '.join(failed_ids)}` from the bank.")
+            await ctx.reply("\n".join(responses))
+        except asyncio.TimeoutError:
+            await ctx.reply("❌ Sell operation canceled due to inactivity.")
+
+
 
 client.run(config.token)
