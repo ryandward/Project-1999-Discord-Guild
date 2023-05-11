@@ -76,28 +76,6 @@ client = commands.Bot(
     case_insensitive=True,
     intents=intents)
 
-def get_player_class(player_class):
-    player_class = titlecase(player_class)
-    player_class_names = player_classes['class_name'].to_list()
-    player_class_name = gcm(player_class, player_class_names, n=1, cutoff=0.5)
-
-    if len(player_class_name) == 0:
-        raise CensusError("Error")
-        return
-
-    else:
-        player_class_name = player_class_name[0]
-        player_class = player_classes.loc[player_classes['class_name']
-                                          == player_class_name, 'character_class'].item()
-        return (player_class)
-
-def get_level(level):
-    if level < 0 or level > 60:
-        raise CensusError("Error")
-        return
-    else:
-        return (level)
-
 # Startup Information
 @client.event
 async def on_ready():
@@ -221,147 +199,302 @@ async def award(ctx, amount: int, name, *, args):
         await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error -1`")
 
 ########################################################################################################
-async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None, discord_id: str = None):
+# def get_player_class(player_class):
+#     player_class = titlecase(player_class)
+#     player_class_names = player_classes['class_name'].to_list()
+#     player_class_name = gcm(player_class, player_class_names, n=1, cutoff=0.5)
+
+#     if len(player_class_name) == 0:
+#         raise CensusError("Error")
+#         return
+
+#     else:
+#         player_class_name = player_class_name[0]
+#         player_class = player_classes.loc[player_classes['class_name']
+#                                           == player_class_name, 'character_class'].item()
+#         return (player_class)
+
+# def get_level(level):
+#     if level < 0 or level > 60:
+#         raise CensusError("Error")
+#         return
+#     else:
+#         return (level)
+    
+# async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None, discord_id: str = None):
+#     if discord_id is None:
+#         discord_id = str(ctx.message.guild.get_member_named(user_name).id)
+    
+#     allowed_channels = [851549677815070751, 862364645695422514]
+
+#     if ctx.channel.id not in allowed_channels:
+#         await ctx.reply("This command can only be performed on <#851549677815070751>.")
+#         raise CensusError('Someone tried to declare a toon that was not on the census channel.')
+
+
+#     census = pd.read_sql_query('SELECT * FROM census', con)
+#     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#     discord_id = ctx.message.guild.get_member_named(user_name).id
+
+#     if player_class is not None:
+#         player_class = get_player_class(player_class)
+
+#     cur.execute('SELECT * FROM census WHERE name == ?;', (toon.capitalize(),))
+
+#     col_names = list(map(lambda x: x[0], cur.description))
+
+#     rows = cur.fetchall()
+
+#     cur.execute('SELECT * FROM dkp WHERE discord_id == ?;', (discord_id,))
+
+#     col_names = list(map(lambda x: x[0], cur.description))
+
+#     discord_exists = cur.fetchall()
+
+#     # if the discord account was not found
+#     if len(discord_exists) == 0:
+
+#         discord_id = ctx.message.guild.get_member_named(user_name).id
+
+#         cur.execute('INSERT INTO dkp (discord_name, earned_dkp, spent_dkp, date_joined, discord_id) VALUES (?, 5, 0, ?, ?);',
+#                     (user_name, current_time, discord_id))
+
+#         if cur.rowcount == 1:
+#             con.commit()
+
+#             channel = client.get_channel(884164383498965042)
+
+#             member = ctx.message.guild.get_member_named(user_name)
+
+#             approved_role = ctx.guild.get_role(1001891874161823884)
+#             await member.remove_roles(approved_role)
+
+#             probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
+#             await member.add_roles(probationary_role)
+
+#             formatted_id = f'<@{discord_id}>'
+
+#             # await channel.send(f"<@&849337092324327454> `{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
+#             await channel.send(f"`{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
+
+#         else:
+#             con.rollback()
+
+#             await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 0`")
+
+#     # if the character was found
+#     # if len(rows) > 1:
+#     #     await ctx.reply("This is a shared character. Demographics cannot be changed currently.")
+
+#     if len(rows) == 1:
+
+#         if level is None:
+
+#             cur.execute('UPDATE census SET status = ?, time = ? WHERE name = ?;',
+#                         (status.capitalize(), current_time, toon.capitalize()))
+
+#             if cur.rowcount == 1:
+
+#                 con.commit()
+
+#                 await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}`")
+
+#             else:
+
+#                 con.rollback()
+
+#                 await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 1`")
+
+#         if level is not None:
+
+#             if player_class is None:
+
+#                 cur.execute('UPDATE census SET status = ?, level = ?, time = ? WHERE name = ?;',
+#                             (status.capitalize(), level, current_time, toon.capitalize()))
+
+#                 if cur.rowcount == 1:
+
+#                     con.commit()
+
+#                     await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}` and level `{level}`")
+
+#                 else:
+
+#                     con.rollback()
+
+#                     await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 2`")
+
+#             if player_class is not None:
+
+#                 cur.execute('UPDATE census SET status = ?, level = ?, character_class = ?, time = ? WHERE name = ?;',
+#                             (status.capitalize(), level, player_class, current_time, toon.capitalize()))
+
+#                 if cur.rowcount == 1:
+
+#                     con.commit()
+
+#                     await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now a level `{level}` `{player_class}` `{status}`")
+
+#                 else:
+#                     con.rollback()
+
+#                     await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 3`")
+
+#     if len(rows) == 0:
+
+#         if player_class is None or level is None:
+
+#             await ctx.reply(f":question:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
+
+#         else:
+
+#             cur.execute('INSERT INTO census (name, level, character_class, discord_id, status, time) VALUES (?, ?, ?, ?, ?, ?);',
+#                         (toon.capitalize(), level, player_class, discord_id, status.capitalize(), current_time))
+
+#             if cur.rowcount == 1:
+
+#                 con.commit()
+
+#                 await ctx.reply(f":white_check_mark:`{toon.capitalize()}` was created and is now a level `{level}` `{player_class}` `{status}`")
+
+#             else:
+#                 con.rollback()
+#                 await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 4`")
+
+#######################################
+# Helper functions
+async def get_discord_id(ctx, user_name, discord_id):
     if discord_id is None:
         discord_id = str(ctx.message.guild.get_member_named(user_name).id)
-    
+    return discord_id
+
+async def check_allowed_channels(ctx):
     allowed_channels = [851549677815070751, 862364645695422514]
-
     if ctx.channel.id not in allowed_channels:
-        await ctx.reply("This command can only be performed on <#851549677815070751>.")
-        raise CensusError('Someone tried to declare a toon that was not on the census channel.')
+        return False
+    return True
 
+def get_census():
+    return pd.read_sql_query('SELECT * FROM census', con)
 
-    census = pd.read_sql_query('SELECT * FROM census', con)
+def get_level(level):
+    if level < 0 or level > 60:
+        raise ValueError("Invalid level. The level must be between 0 and 60.")
+    else:
+        return (level)
+
+async def get_player_class(player_class):
+    player_class = titlecase(player_class)
+    player_class_names = player_classes['class_name'].to_list()
+    player_class_name = gcm(player_class, player_class_names, n=1, cutoff=0.5)
+    if len(player_class_name) == 0:
+        raise ValueError("Invalid player class. Please provide a valid player class.")
+    else:
+        player_class_name = player_class_name[0]
+        player_class = player_classes.loc[player_classes['class_name'] == player_class_name, 'character_class'].item()
+        return player_class
+
+def get_toon_data(toon):
+    cur.execute('SELECT * FROM census WHERE name == ?;', (toon.capitalize(),))
+    rows = cur.fetchall()
+    return rows
+
+def check_discord_exists(discord_id):
+    cur.execute('SELECT * FROM dkp WHERE discord_id == ?;', (discord_id,))
+    discord_exists = cur.fetchall()
+    return len(discord_exists) > 0
+
+def add_user_to_dkp(user_name, discord_id, current_time):
+    cur.execute('INSERT INTO dkp (discord_name, earned_dkp, spent_dkp, date_joined, discord_id) VALUES (?, 5, 0, ?, ?);',
+                (user_name, current_time, discord_id))
+    con.commit()
+
+def update_census(toon, status, level, player_class, current_time):
+    if level is None:
+        cur.execute('UPDATE census SET status = ?, time = ? WHERE name = ?;',
+                    (status.capitalize(), current_time, toon.capitalize()))
+    elif player_class is None:
+        cur.execute('UPDATE census SET status = ?, level = ?, time = ? WHERE name = ?;',
+                    (status.capitalize(), level, current_time, toon.capitalize()))
+    else:
+        cur.execute('UPDATE census SET status = ?, level = ?, character_class = ?, time = ? WHERE name = ?,',
+                    (status.capitalize(), level, player_class, current_time, toon.capitalize()))
+    con.commit()
+
+def insert_to_census(toon, level, player_class, discord_id, status, current_time):
+    cur.execute('INSERT INTO census (name, level, character_class, discord_id, status, time) VALUES (?, ?, ?, ?, ?, ?);',
+                (toon.capitalize(), level, player_class, discord_id, status.capitalize(), current_time))
+    con.commit()
+
+# Main function
+async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None, discord_id: str = None):
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    discord_id = ctx.message.guild.get_member_named(user_name).id
+    
+    try:
+        discord_id = await get_discord_id(ctx, user_name, discord_id)
+    except Exception as e:
+        await ctx.reply(f"An error occurred while getting the discord id: {str(e)}")
+        return
+
+    if not await check_allowed_channels(ctx):
+        await ctx.reply("This action must be performed on <#851549677815070751>.")
+        return
+
+    try:
+        census = get_census()
+    except Exception as e:
+        await ctx.reply(f"An error occurred while getting the census: {str(e)}")
+        return
 
     if player_class is not None:
-        player_class = get_player_class(player_class)
+        try:
+            player_class = await get_player_class(player_class)
+        except Exception as e:
+            await ctx.reply(f"An error occurred while getting the player class: {str(e)}")
+            return
 
-    cur.execute('SELECT * FROM census WHERE name == ?;', (toon.capitalize(),))
+    try:
+        toon_data = get_toon_data(toon)
+    except Exception as e:
+        await ctx.reply(f"An error occurred while getting the toon data: {str(e)}")
+        return
 
-    col_names = list(map(lambda x: x[0], cur.description))
+    try:
+        discord_exists = check_discord_exists(discord_id)
+    except Exception as e:
+        await ctx.reply(f"An error occurred while checking if discord exists: {str(e)}")
+        return
 
-    rows = cur.fetchall()
+    if not discord_exists:
+        try:
+            add_user_to_dkp(user_name, discord_id, current_time)
+        except Exception as e:
+            await ctx.reply(f"An error occurred while adding user to dkp: {str(e)}")
+            return
+    
+    if player_class is not None and level is not None:
+        try:
+            insert_to_census(toon, level, player_class, discord_id, status, current_time)
+            await ctx.reply(f":white_check_mark:`{toon.capitalize()}` was created and is now a level `{level}` `{player_class}` `{status}`")
+            return
+        except Exception as e:
+            await ctx.reply(f"An error occurred while inserting toon to census: {str(e)}")
+            return
 
-    cur.execute('SELECT * FROM dkp WHERE discord_id == ?;', (discord_id,))
+    if len(toon_data) == 1:
+        try:
+            update_census(toon, status, level, player_class, current_time)
+            await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}`")
+            return
+        except Exception as e:
+            await ctx.reply(f"An error occurred while updating census: {str(e)}")
+            return
 
-    col_names = list(map(lambda x: x[0], cur.description))
-
-    discord_exists = cur.fetchall()
-
-    # if the discord account was not found
-    if len(discord_exists) == 0:
-
-        discord_id = ctx.message.guild.get_member_named(user_name).id
-
-        cur.execute('INSERT INTO dkp (discord_name, earned_dkp, spent_dkp, date_joined, discord_id) VALUES (?, 5, 0, ?, ?);',
-                    (user_name, current_time, discord_id))
-
-        if cur.rowcount == 1:
-            con.commit()
-
-            channel = client.get_channel(884164383498965042)
-
-            member = ctx.message.guild.get_member_named(user_name)
-
-            approved_role = ctx.guild.get_role(1001891874161823884)
-            await member.remove_roles(approved_role)
-
-            probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
-            await member.add_roles(probationary_role)
-
-            formatted_id = f'<@{discord_id}>'
-
-            # await channel.send(f"<@&849337092324327454> `{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
-            await channel.send(f"`{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
-
-        else:
-            con.rollback()
-
-            await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 0`")
-
-    # if the character was found
-    # if len(rows) > 1:
-    #     await ctx.reply("This is a shared character. Demographics cannot be changed currently.")
-
-    if len(rows) == 1:
-
-        if level is None:
-
-            cur.execute('UPDATE census SET status = ?, time = ? WHERE name = ?;',
-                        (status.capitalize(), current_time, toon.capitalize()))
-
-            if cur.rowcount == 1:
-
-                con.commit()
-
-                await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}`")
-
-            else:
-
-                con.rollback()
-
-                await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 1`")
-
-        if level is not None:
-
-            if player_class is None:
-
-                cur.execute('UPDATE census SET status = ?, level = ?, time = ? WHERE name = ?;',
-                            (status.capitalize(), level, current_time, toon.capitalize()))
-
-                if cur.rowcount == 1:
-
-                    con.commit()
-
-                    await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}` and level `{level}`")
-
-                else:
-
-                    con.rollback()
-
-                    await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 2`")
-
-            if player_class is not None:
-
-                cur.execute('UPDATE census SET status = ?, level = ?, character_class = ?, time = ? WHERE name = ?;',
-                            (status.capitalize(), level, player_class, current_time, toon.capitalize()))
-
-                if cur.rowcount == 1:
-
-                    con.commit()
-
-                    await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now a level `{level}` `{player_class}` `{status}`")
-
-                else:
-                    con.rollback()
-
-                    await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 3`")
-
-    if len(rows) == 0:
-
-        if player_class is None or level is None:
-
-            await ctx.reply(f":question:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
-
-        else:
-
-            cur.execute('INSERT INTO census (name, level, character_class, discord_id, status, time) VALUES (?, ?, ?, ?, ?, ?);',
-                        (toon.capitalize(), level, player_class, discord_id, status.capitalize(), current_time))
-
-            if cur.rowcount == 1:
-
-                con.commit()
-
-                await ctx.reply(f":white_check_mark:`{toon.capitalize()}` was created and is now a level `{level}` `{player_class}` `{status}`")
-
-            else:
-                con.rollback()
-                await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 4`")
+    await ctx.reply(f":question:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
 
 
+
+#######################################
 @client.command()
 @commands.has_role("Officer")
 async def promote(ctx, name):
@@ -600,25 +733,23 @@ async def toons(ctx, toon=None):
     except Exception as e:
         await ctx.reply(content=f":x: An error occurred: {str(e)}")
 
+
 async def get_dkp_data(discord_id, toon=None):
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
     dkp = pd.read_sql_table("dkp", con=engine)
     census = pd.read_sql_table("census", con=engine)
 
-    if toon is None:
-        dkp_mains = census[census.discord_id == discord_id][['discord_id', 'name']]
-    else:
+    if toon is not None:
         toon = toon.capitalize()
-        dkp_mains = census[census.name == toon][['discord_id', 'name']]
-        discord_id = dkp_mains['discord_id'].iloc[0] if not dkp_mains.empty else None
+        toon_owner = census[census.name == toon][['discord_id']]
+        discord_id = toon_owner['discord_id'].iloc[0] if not toon_owner.empty else None
 
-    # Look up the Main character associated with the found discord_id
-    main_character = census[(census.discord_id == discord_id) & (census.status == 'Main')][['discord_id', 'name']]
-    
-    dkp_dict = dkp.merge(main_character, how='inner', on='discord_id')
+    # Fetch the DKP data associated with the found discord_id
+    dkp_dict = dkp[dkp.discord_id == discord_id].copy()  # make an explicit copy
     dkp_dict["current_dkp"] = dkp_dict["earned_dkp"] - dkp_dict["spent_dkp"]
 
     return discord_id, dkp_dict
+
 
 
 
