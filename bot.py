@@ -490,7 +490,7 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
             await ctx.reply(f"An error occurred while updating census: {str(e)}")
             return
 
-    await ctx.reply(f":question:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
+    await ctx.reply(f":exclamation:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
 
 
 
@@ -528,50 +528,69 @@ async def assign(ctx, status, toon, level: int = None, player_class: str = None,
 
     await declare_toon(ctx, status, toon, level, player_class, user_name=user_name, discord_id=str(user_id))
 
-
+async def check_ownership(census, discord_id, toon):
+    return not census.loc[(census['discord_id'] == discord_id) & (census['name'] == toon)].empty
 
 @client.command()
 async def main(ctx, toon, level: int = None, player_class: str = None):
-
+    user_name = format(ctx.author)
     toon = toon.capitalize()
 
-    census = pd.read_sql_query('SELECT * FROM census', con)
+    try:
+        user_discord_id = await get_discord_id(ctx, user_name, None)
 
-    toon_discord_id = census.loc[census["name"] == toon, "discord_id"]
+        census = get_census()
+        if not await check_ownership(census, user_discord_id, toon):
+            await ctx.reply(f"`{toon}` does not belong to you.")
+            return
 
-    if len(toon_discord_id) > 0:
-        toon_discord_id = toon_discord_id.item()
-        toon_mains = census.loc[(census['discord_id'] == toon_discord_id) & (
-            census['status'] == "Main") & (census['name'] != toon), 'name'].to_list()
+        # Check if toon is already main
+        existing_mains = census.loc[(census['discord_id'] == user_discord_id) & (census['status'] == "Main"), 'name'].to_list()
+        if toon in existing_mains:
+            await ctx.reply(f"`{toon}` is already your main character.")
+            return
 
-        for i in toon_mains:
-            await alt(ctx, i)
+        # Demote any existing main characters for this user to alts
+        for main in existing_mains:
+            await alt(ctx, main)
 
-    else:
-        user_discord_id = str(
-            ctx.message.guild.get_member_named(format(ctx.author)).id)
-        user_mains = census.loc[(census['discord_id'] == user_discord_id) & (
-            census['status'] == "Main") & (census['name'] != toon), 'name'].to_list()
-
-        for i in user_mains:
-            await alt(ctx, i)
-
-    user_name = format(ctx.author)
-    await declare_toon(ctx, "Main", toon, level, player_class, user_name)
-
+        await declare_toon(ctx, "Main", toon, level, player_class, user_name)
+    except Exception as e:
+        await ctx.reply(f"Error in promoting `{toon}` to main: {e}")
 
 @client.command()
 async def bot(ctx, toon, level: int = None, player_class: str = None):
-
     user_name = format(ctx.author)
-    await declare_toon(ctx, "Bot", toon, level, player_class, user_name)
+    toon = toon.capitalize()
 
+    try:
+        user_discord_id = await get_discord_id(ctx, user_name, None)
+
+        census = get_census()
+        if not await check_ownership(census, user_discord_id, toon):
+            await ctx.reply(f"`{toon}` does not belong to you.")
+            return
+
+        await declare_toon(ctx, "Bot", toon, level, player_class, user_name)
+    except Exception as e:
+        await ctx.reply(f"Error in declaring `{toon}` as a bot: {e}")
 
 @client.command()
 async def alt(ctx, toon, level: int = None, player_class: str = None):
-
     user_name = format(ctx.author)
-    await declare_toon(ctx, "Alt", toon, level, player_class, user_name)
+    toon = toon.capitalize()
+
+    try:
+        user_discord_id = await get_discord_id(ctx, user_name, None)
+
+        census = get_census()
+        if not await check_ownership(census, user_discord_id, toon):
+            await ctx.reply(f"`{toon}` does not belong to you.")
+            return
+
+        await declare_toon(ctx, "Alt", toon, level, player_class, user_name)
+    except Exception as e:
+        await ctx.reply(f"Error in declaring `{toon}` as an alt: {e}")
 
 
 @client.command()
