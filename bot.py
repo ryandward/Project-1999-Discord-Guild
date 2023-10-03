@@ -92,7 +92,8 @@ async def ping(ctx):
 @client.command()
 async def apply(ctx):
 
-    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+    # discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+    discord_id = str(ctx.author.id)
     channel = client.get_channel(988260644056879194)  # census chat
     member = await ctx.guild.fetch_member(discord_id)
     applicant_role = ctx.guild.get_role(990817141831901234)  # come back to this
@@ -198,174 +199,11 @@ async def award(ctx, amount: int, name, *, args):
 
         await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error -1`")
 
-########################################################################################################
-# def get_player_class(player_class):
-#     player_class = titlecase(player_class)
-#     player_class_names = player_classes['class_name'].to_list()
-#     player_class_name = gcm(player_class, player_class_names, n=1, cutoff=0.5)
-
-#     if len(player_class_name) == 0:
-#         raise CensusError("Error")
-#         return
-
-#     else:
-#         player_class_name = player_class_name[0]
-#         player_class = player_classes.loc[player_classes['class_name']
-#                                           == player_class_name, 'character_class'].item()
-#         return (player_class)
-
-# def get_level(level):
-#     if level < 0 or level > 60:
-#         raise CensusError("Error")
-#         return
-#     else:
-#         return (level)
-    
-# async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None, discord_id: str = None):
-#     if discord_id is None:
-#         discord_id = str(ctx.message.guild.get_member_named(user_name).id)
-    
-#     allowed_channels = [851549677815070751, 862364645695422514]
-
-#     if ctx.channel.id not in allowed_channels:
-#         await ctx.reply("This command can only be performed on <#851549677815070751>.")
-#         raise CensusError('Someone tried to declare a toon that was not on the census channel.')
-
-
-#     census = pd.read_sql_query('SELECT * FROM census', con)
-#     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-#     discord_id = ctx.message.guild.get_member_named(user_name).id
-
-#     if player_class is not None:
-#         player_class = get_player_class(player_class)
-
-#     cur.execute('SELECT * FROM census WHERE name == ?;', (toon.capitalize(),))
-
-#     col_names = list(map(lambda x: x[0], cur.description))
-
-#     rows = cur.fetchall()
-
-#     cur.execute('SELECT * FROM dkp WHERE discord_id == ?;', (discord_id,))
-
-#     col_names = list(map(lambda x: x[0], cur.description))
-
-#     discord_exists = cur.fetchall()
-
-#     # if the discord account was not found
-#     if len(discord_exists) == 0:
-
-#         discord_id = ctx.message.guild.get_member_named(user_name).id
-
-#         cur.execute('INSERT INTO dkp (discord_name, earned_dkp, spent_dkp, date_joined, discord_id) VALUES (?, 5, 0, ?, ?);',
-#                     (user_name, current_time, discord_id))
-
-#         if cur.rowcount == 1:
-#             con.commit()
-
-#             channel = client.get_channel(884164383498965042)
-
-#             member = ctx.message.guild.get_member_named(user_name)
-
-#             approved_role = ctx.guild.get_role(1001891874161823884)
-#             await member.remove_roles(approved_role)
-
-#             probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
-#             await member.add_roles(probationary_role)
-
-#             formatted_id = f'<@{discord_id}>'
-
-#             # await channel.send(f"<@&849337092324327454> `{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
-#             await channel.send(f"`{toon}` just joined the server using the discord handle {formatted_id} and is now a probationary member.")
-
-#         else:
-#             con.rollback()
-
-#             await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 0`")
-
-#     # if the character was found
-#     # if len(rows) > 1:
-#     #     await ctx.reply("This is a shared character. Demographics cannot be changed currently.")
-
-#     if len(rows) == 1:
-
-#         if level is None:
-
-#             cur.execute('UPDATE census SET status = ?, time = ? WHERE name = ?;',
-#                         (status.capitalize(), current_time, toon.capitalize()))
-
-#             if cur.rowcount == 1:
-
-#                 con.commit()
-
-#                 await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}`")
-
-#             else:
-
-#                 con.rollback()
-
-#                 await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 1`")
-
-#         if level is not None:
-
-#             if player_class is None:
-
-#                 cur.execute('UPDATE census SET status = ?, level = ?, time = ? WHERE name = ?;',
-#                             (status.capitalize(), level, current_time, toon.capitalize()))
-
-#                 if cur.rowcount == 1:
-
-#                     con.commit()
-
-#                     await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now `{status}` and level `{level}`")
-
-#                 else:
-
-#                     con.rollback()
-
-#                     await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 2`")
-
-#             if player_class is not None:
-
-#                 cur.execute('UPDATE census SET status = ?, level = ?, character_class = ?, time = ? WHERE name = ?;',
-#                             (status.capitalize(), level, player_class, current_time, toon.capitalize()))
-
-#                 if cur.rowcount == 1:
-
-#                     con.commit()
-
-#                     await ctx.reply(f":white_check_mark:`{toon.capitalize()}` is now a level `{level}` `{player_class}` `{status}`")
-
-#                 else:
-#                     con.rollback()
-
-#                     await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 3`")
-
-#     if len(rows) == 0:
-
-#         if player_class is None or level is None:
-
-#             await ctx.reply(f":question:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
-
-#         else:
-
-#             cur.execute('INSERT INTO census (name, level, character_class, discord_id, status, time) VALUES (?, ?, ?, ?, ?, ?);',
-#                         (toon.capitalize(), level, player_class, discord_id, status.capitalize(), current_time))
-
-#             if cur.rowcount == 1:
-
-#                 con.commit()
-
-#                 await ctx.reply(f":white_check_mark:`{toon.capitalize()}` was created and is now a level `{level}` `{player_class}` `{status}`")
-
-#             else:
-#                 con.rollback()
-#                 await ctx.reply(f":question:Something weird happened, ask Rahmani. `Error 4`")
-
-#######################################
 # Helper functions
 async def get_discord_id(ctx, user_name, discord_id):
     if discord_id is None:
-        discord_id = str(ctx.message.guild.get_member_named(user_name).id)
+        # discord_id = str(ctx.message.guild.get_member_named(user_name).id)
+        discord_id = str(ctx.author.id)
     return discord_id
 
 async def check_allowed_channels(ctx):
@@ -427,9 +265,10 @@ def insert_to_census(toon, level, player_class, discord_id, status, current_time
     con.commit()
 
 # Main function
+
 async def declare_toon(ctx, status, toon, level: int = None, player_class: str = None, user_name: str = None, discord_id: str = None):
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     try:
         discord_id = await get_discord_id(ctx, user_name, discord_id)
     except Exception as e:
@@ -468,10 +307,16 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
     if not discord_exists:
         try:
             add_user_to_dkp(user_name, discord_id, current_time)
+            probationary_role = ctx.guild.get_role(884172643702546473)
+            probationary_discussion = client.get_channel(884164383498965042)
+
+            await ctx.message.author.add_roles(probationary_role)
+            await probationary_discussion.send(f"`{toon}` just joined the server using the discord handle <@{discord_id}> and is now a probationary member.")
+
         except Exception as e:
             await ctx.reply(f"An error occurred while adding user to dkp: {str(e)}")
             return
-    
+
     if player_class is not None and level is not None:
         try:
             insert_to_census(toon, level, player_class, discord_id, status, current_time)
@@ -490,108 +335,89 @@ async def declare_toon(ctx, status, toon, level: int = None, player_class: str =
             await ctx.reply(f"An error occurred while updating census: {str(e)}")
             return
 
-    await ctx.reply(f":exclamation:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
+    if len(toon_data) == 0:
+        await ctx.reply(f":exclamation:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`")
+        return
 
-
+    if len(toon_data) > 1:
+        await ctx.reply(f":exclamation:`{toon.capitalize()}` is ambiguous\nSee `!help main/alt/drop`")
+        return
 
 #######################################
 @client.command()
 @commands.has_role("Officer")
 async def promote(ctx, name):
+    try:
+        name = name.capitalize()
+        census = pd.read_sql_query('SELECT * FROM census', con)
+        dkp = pd.read_sql_query('SELECT * FROM dkp', con)
+        discord_id = census.loc[census["name"] == name, "discord_id"].item()
 
-    name = name.capitalize()
-    census = pd.read_sql_query('SELECT * FROM census', con)
-    dkp = pd.read_sql_query('SELECT * FROM dkp', con)
-    discord_id = census.loc[census["name"] == name, "discord_id"].item()
+        channel = client.get_channel(851549677815070751)  # census chat
+        member = await ctx.guild.fetch_member(discord_id)
+        probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
+        member_role = ctx.guild.get_role(870669705646587924)
 
-    channel = client.get_channel(851549677815070751)  # census chat
-    member = await ctx.guild.fetch_member(discord_id)
-    probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
-    member_role = ctx.guild.get_role(870669705646587924)
+        await member.remove_roles(probationary_role)
+        await member.add_roles(member_role)
 
-    await member.remove_roles(probationary_role)
-    await member.add_roles(member_role)
+        await ctx.reply(f"{name} has been promoted to full member.")
+        await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
+    except AttributeError:
+        await ctx.reply(f"Sorry, a user with the name {name} could not be found. Please check the spelling and try again.")
+    except Exception as e:
+        await ctx.reply(f"An error occurred while promoting {name}. Error message: {e}")
 
-    # await ctx.reply(f"<@&849337092324327454> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
-    # await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
-
-    await ctx.reply(f"<@{discord_id}>, has been promoted to full member.")
-    await channel.send(f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!")
 
 @client.command()
 @commands.has_role("Officer")
-async def assign(ctx, status, toon, level: int = None, player_class: str = None, user_id: int = None):
-    if user_id is None:
-        user_id = ctx.author.id
+async def assign(ctx, status, toon, level: int = None, player_class: str = None, discord_id: int = None):
+    if discord_id is None:
+        discord_id = ctx.author.id
 
-    user_name = ctx.guild.get_member(user_id).display_name
+    user_name = ctx.guild.get_member(discord_id).display_name
 
-    await declare_toon(ctx, status, toon, level, player_class, user_name=user_name, discord_id=str(user_id))
-
-async def check_ownership(census, discord_id, toon):
-    return not census.loc[(census['discord_id'] == discord_id) & (census['name'] == toon)].empty
+    await declare_toon(ctx, status, toon, level, player_class, user_name=user_name, discord_id=str(discord_id))
 
 @client.command()
 async def main(ctx, toon, level: int = None, player_class: str = None):
     user_name = format(ctx.author)
     toon = toon.capitalize()
-
+    census = get_census()
     try:
+        toon_discord_id = census.loc[census["name"] == toon, "discord_id"].item()
+    except ValueError:
         user_discord_id = await get_discord_id(ctx, user_name, None)
+        user_mains = census.loc[(census['discord_id'] == user_discord_id) & (
+            census['status'] == "Main"), 'name'].to_list()
+        for i in user_mains:
+            await alt(ctx, i)
+    else:
+        try:
+            toon_mains = census.loc[(census['discord_id'] == toon_discord_id) & (
+                census['status'] == "Main") & (census['name'] != toon), 'name'].to_list()
+            for i in toon_mains:
+                await alt(ctx, i)
+        except ValueError:
+            pass
+    await declare_toon(ctx, "Main", toon, level, player_class, user_name)
 
-        census = get_census()
-        if not await check_ownership(census, user_discord_id, toon):
-            await ctx.reply(f"`{toon}` does not belong to you.")
-            return
-
-        # Check if toon is already main
-        existing_mains = census.loc[(census['discord_id'] == user_discord_id) & (census['status'] == "Main"), 'name'].to_list()
-        if toon in existing_mains:
-            await ctx.reply(f"`{toon}` is already your main character.")
-            return
-
-        # Demote any existing main characters for this user to alts
-        for main in existing_mains:
-            await alt(ctx, main)
-
-        await declare_toon(ctx, "Main", toon, level, player_class, user_name)
-    except Exception as e:
-        await ctx.reply(f"Error in promoting `{toon}` to main: {e}")
 
 @client.command()
 async def bot(ctx, toon, level: int = None, player_class: str = None):
     user_name = format(ctx.author)
-    toon = toon.capitalize()
-
     try:
-        user_discord_id = await get_discord_id(ctx, user_name, None)
-
-        census = get_census()
-        if not await check_ownership(census, user_discord_id, toon):
-            await ctx.reply(f"`{toon}` does not belong to you.")
-            return
-
         await declare_toon(ctx, "Bot", toon, level, player_class, user_name)
-    except Exception as e:
-        await ctx.reply(f"Error in declaring `{toon}` as a bot: {e}")
+    except ValueError as e:
+        await ctx.reply(f"Error: {e}")
 
 @client.command()
 async def alt(ctx, toon, level: int = None, player_class: str = None):
     user_name = format(ctx.author)
-    toon = toon.capitalize()
-
     try:
-        user_discord_id = await get_discord_id(ctx, user_name, None)
-
-        census = get_census()
-        if not await check_ownership(census, user_discord_id, toon):
-            await ctx.reply(f"`{toon}` does not belong to you.")
-            return
-
         await declare_toon(ctx, "Alt", toon, level, player_class, user_name)
-    except Exception as e:
-        await ctx.reply(f"Error in declaring `{toon}` as an alt: {e}")
-
+    except ValueError as e:
+        await ctx.reply(f"Error: {e}")
 
 @client.command()
 async def drop(ctx, toon, level: int = None, player_class: str = None):
@@ -797,8 +623,7 @@ def create_dkp_embed(user, dkp_dict):
 
 @client.command()
 async def dkp(ctx, toon=None):
-    discord_id, dkp_dict = await get_dkp_data(str(ctx.message.guild.get_member_named(str(ctx.author)).id), toon)
-
+    discord_id, dkp_dict = await get_dkp_data(str(ctx.author.id), toon)
     if not dkp_dict.empty:
         user = ctx.guild.get_member(int(discord_id)) if discord_id is not None else None
         dkp_embed = create_dkp_embed(user, dkp_dict)
@@ -1046,8 +871,8 @@ async def sanctum(ctx, toon=None):
 
     if toon == None:
         user_name = format(ctx.author)
-        discord_id = str(ctx.message.guild.get_member_named(user_name).id)
-
+        # discord_id = str(ctx.message.guild.get_member_named(user_name).id)
+        discord_id = str(ctx.author.id)
     if toon != None:
         toon = toon.capitalize()
         user_name = format(toon)
@@ -1214,7 +1039,8 @@ async def banktotals(ctx):
 async def bidhistory(ctx):
 
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
-    discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    discord_id = str(ctx.author.id)
     items = pd.read_sql_table("items", con=engine)
     items = items.loc[items['discord_id'] == discord_id]
     items = items[["name", "date", "item", "dkp_spent"]]
@@ -1238,7 +1064,8 @@ async def bidhistory(ctx):
 async def dkphistory(ctx):
 
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
-    discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    discord_id = str(ctx.author.id)
     attendance = pd.read_sql_table("attendance", con=engine)
     attendance = attendance.loc[attendance['discord_id'] == discord_id]
     attendance = attendance[["name", "date", "raid", "modifier"]]
@@ -1258,9 +1085,11 @@ async def dkphistory(ctx):
     os.remove(dkp_file)
     return
 
+
+
 @client.command()
 async def who(ctx, level, optional_max_level=None, player_class=None):
-    level, max_level, player_class = validate_and_process_input(ctx, level, optional_max_level, player_class)
+    level, max_level, player_class = await validate_and_process_input(ctx, level, optional_max_level, player_class)
     if level is None:
         return
     matching_toons = fetch_matching_toons(level, max_level, player_class)
@@ -1269,7 +1098,14 @@ async def who(ctx, level, optional_max_level=None, player_class=None):
     else:
         await reply_matching_toons(ctx, matching_toons, level, max_level, player_class)
 
-def validate_and_process_input(ctx, level, optional_max_level, player_class):
+async def send_split_message(ctx, message):
+    max_length = 2000
+    messages = [message[i:i + max_length] for i in range(0, len(message), max_length)]
+    for msg in messages:
+        await ctx.send(msg)
+
+
+async def validate_and_process_input(ctx, level, optional_max_level, player_class):
     try:
         level = int(level)
     except ValueError:
@@ -1294,7 +1130,7 @@ def validate_and_process_input(ctx, level, optional_max_level, player_class):
         ctx.reply("You think you're funny, huh?")
         return None, None, None
 
-    return level, max_level, get_player_class(player_class) if player_class is not None else None
+    return level, max_level, await get_player_class(player_class) if player_class is not None else None
 
 def fetch_matching_toons(level, max_level, player_class):
     Base = automap_base()
@@ -1323,6 +1159,7 @@ async def reply_no_matching_toon(ctx, level, max_level, player_class):
     else:
         await ctx.reply(f"There were no level {level} to {max_level} {player_class}s found.")
 
+
 async def reply_matching_toons(ctx, matching_toons, level, max_level, player_class):
     guild = ctx.guild
     names = []
@@ -1332,15 +1169,15 @@ async def reply_matching_toons(ctx, matching_toons, level, max_level, player_cla
     for _, row in matching_toons.iterrows():
         name = row["name"]
         discord_id = row["discord_id"]
-        level = row["level"]
+        toon_level = row["level"]
         member = guild.get_member(int(discord_id))
 
         if member is not None:
             names.append(name)
-            if level == max_level or level == level:
-                mentions.append((discord_id, level))
+            if toon_level == max_level or toon_level == level:
+                mentions.append((discord_id, toon_level))
             else:
-                mentions.append((discord_id, f"{level}-{max_level}"))
+                mentions.append((discord_id, f"{toon_level}-{max_level}"))
         else:
             left_server_names.append(name)
 
@@ -1356,7 +1193,7 @@ async def reply_matching_toons(ctx, matching_toons, level, max_level, player_cla
 
     embed.add_field(
         name=":busts_in_silhouette: Discord",
-        value="".join([f"`{' ' if level < 10 else ''}{mention[1]}`<@{mention[0]}>\n" for mention in mentions]),
+        value="".join([f"`{' ' if toon_level < 10 else ''}{mention[1]}`<@{mention[0]}>\n" for mention in mentions]),
         inline=True)
 
     if left_server_names:
@@ -1365,13 +1202,12 @@ async def reply_matching_toons(ctx, matching_toons, level, max_level, player_cla
 
     await ctx.reply(embed=embed)
 
-
 @client.command()
 async def claim(ctx, toon):
 
     toon = toon.capitalize()
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+    discord_id = str(ctx.author.id)
 
     Base = automap_base()
     engine = create_engine(config.db_url)
@@ -1439,7 +1275,8 @@ async def raid_roles(ctx, toon=None):
 
 
     if toon == None:
-        discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+        # discord_id = ctx.message.guild.get_member_named(format(ctx.author)).id
+        discord_id = str(ctx.author.id)
         toons = census.loc[census["discord_id"] == str(discord_id)]
 
     else:
@@ -1514,23 +1351,6 @@ def build_sell_embed(name, banker, banker_results):
     search_embed.timestamp = datetime.datetime.now(pytz.timezone('US/Pacific'))
 
     return search_embed
-
-@client.command()
-async def sell2(ctx, *, name):
-    try:
-        original_name = titlecase(name)
-        search_results = await fetch_bank_items(original_name)
-
-        if search_results.empty:
-            await ctx.reply(f"None of the bankers currently have `{original_name}`.")
-        else:
-            unique_bankers = search_results["banker"].unique()
-            for i in unique_bankers:
-                banker_results = search_results.loc[search_results["banker"] == i]
-                search_embed = build_sell_embed(original_name, i, banker_results)
-                await ctx.reply(embed=search_embed)
-    except Exception as e:
-        await ctx.reply(content=f":x: An error occurred: {str(e)}")
 
 import re
 
