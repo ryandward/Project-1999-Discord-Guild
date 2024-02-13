@@ -1,4 +1,4 @@
-# ex_astra_bot
+# Project 1999 Discord Guild Bot!
 
 ## Setup
 - `cp config.py.template config.py`
