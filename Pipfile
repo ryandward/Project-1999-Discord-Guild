@@ -45,6 +45,8 @@ tabgenie = "*"
 html2markdown = "*"
 pypandoc = "*"
 colorlog = "*"
+psycopg2 = "*"
+asyncpg = "*"
 
 [dev-packages]
 pylint = "*"

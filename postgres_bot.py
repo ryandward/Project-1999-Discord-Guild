@@ -10,15 +10,24 @@ import os
 import sqlite3
 import subprocess
 import tempfile
-import time
 from difflib import get_close_matches as gcm
 from pathlib import Path
 from urllib.request import Request, urlopen
 from Buttons import DMButton, DeleteButton
+from ToonUtils import ToonUtils
 from embed_assisted_questions import ask_async
 from discord.ext import commands
 from discord import Embed
 from discord import app_commands
+from sqlalchemy.orm import scoped_session
+
+
+from sqlalchemy.orm import scoped_session
+from sqlalchemy.orm import sessionmaker
+from collections import defaultdict, OrderedDict
+import discord
+from discord.ext import commands
+
 
 import psycopg2
 import aiohttp
@@ -62,6 +71,7 @@ engine = create_engine(
 
 # Create a session
 Session = sessionmaker(bind=engine)
+ScopedSession = scoped_session(Session)
 
 # Get the Base class
 Base = automap_base()
@@ -93,6 +103,7 @@ class PersistentViewBot(commands.Bot):
         await self.add_cog(ApplicationCog(self))
         await self.add_cog(CensusUtils(self))
         await self.add_cog(BotUtils(self))
+        await self.add_cog(ToonUtils(self))
         self.tree.copy_global_to(guild=MY_GUILD)
 
     async def on_ready(self):
@@ -122,6 +133,7 @@ class ApplicationCog(commands.Cog):
         await ctx.reply(
             f"Attention <@816198379344232488>, <@{discord_id}>, has submitted an application."
         )
+
 
 
 class CensusUtils(commands.Cog):
