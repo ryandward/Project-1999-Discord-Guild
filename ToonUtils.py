@@ -1,6 +1,6 @@
 from Buttons import DMButton, DeleteButton
 from config import pgdata, pghost, pgpass, pguser
-
+import logging
 
 import discord
 from discord.ext import commands
@@ -13,6 +13,10 @@ from sqlalchemy.orm import sessionmaker
 import asyncio
 import time
 from collections import defaultdict
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class ToonUtils(commands.Cog):
@@ -50,24 +54,53 @@ class ToonUtils(commands.Cog):
 
     async def toon_autocomplete(self, interaction: discord.Interaction, current: str):
         now = time.time()
-        cache_entry = self.cache.get(current)
 
-        # Check if cache entry exists and is fresh
-        if cache_entry and now - cache_entry['timestamp'] < 60:  # 60 seconds freshness threshold
-            return cache_entry['choices']
+        if not current:
+            logger.info("Empty query received; skipping cache and database query.")
+            return []
 
-        # Fetch fresh data and update cache
+        logger.info(f"Autocomplete requested for '{current}'.")
+
+        # Check cache first
+        for cache_key in self.cache.keys():
+            if current.startswith(cache_key):
+                cache_entry = self.cache[cache_key]
+                if now - cache_entry["timestamp"] < 60:  # Cache freshness check
+                    filtered_choices = [
+                        choice
+                        for choice in cache_entry["choices"]
+                        if current.lower() in choice.name.lower()
+                    ][
+                        :25
+                    ]  # Ensure no more than 25 choices are returned
+                    logger.info(
+                        f"Cache hit for '{current}' using cache key '{cache_key}'. {len(filtered_choices)} choices returned after filtering."
+                    )
+                    return filtered_choices
+                else:
+                    logger.info(f"Cache entry for key '{cache_key}' is stale.")
+
+        # If not found in cache, fetch from database
+        logger.info(f"No suitable cache found for '{current}'. Querying database.")
         async with self.AsyncSession() as session:
-            stmt = select(self.tables['census'].name).where(
-                self.tables['census'].name.ilike(f"%{current}%")
-            ).limit(25)
+            stmt = select(self.tables["census"].name, self.tables["census"].discord_id).where(
+                self.tables["census"].name.ilike(f"%{current}%")
+            )
+            
             results = await session.execute(stmt)
             choices = [
-                discord.app_commands.Choice(name=row, value=row) for row in results.scalars().all()
-            ]
+                discord.app_commands.Choice(name=row, value=row)
+                for row in results.scalars().all()
+            ][
+                :25
+            ]  # Ensure no more than 25 choices are returned
+            logger.info(
+                f"Database query completed for '{current}'. {len(choices)} choices fetched and cached."
+            )
 
             # Update cache with new data and timestamp
-            self.cache[current] = {'choices': choices, 'timestamp': now}
+            self.cache[current] = {"choices": choices, "timestamp": now}
+            logger.info(f"Cache updated for '{current}'.")
 
             return choices
 
