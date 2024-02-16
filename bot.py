@@ -146,6 +146,7 @@ def check_reply(ctx):
 
 
 def chunk_strings(s, limit=1900):
+    s = s.replace("`", "'")
     lines = s.split("\n")
     chunks, chunk = [], lines[0]
     for line in lines[1:]:
@@ -161,6 +162,13 @@ def chunk_strings(s, limit=1900):
 con = sqlite3.connect("ex_astra.db")
 con.execute("PRAGMA foreign_keys = ON")
 cur = con.cursor()
+
+
+def close_connection():
+    global con
+    if con is not None:
+        con.close()
+
 
 player_classes = pd.read_sql_query("SELECT * FROM class_definitions", con)
 raids = pd.read_sql_query("SELECT * FROM raids", con)
@@ -285,10 +293,8 @@ async def globally_block_dms(ctx):
 
 @client.command(help="Check the bot's latency.", brief="Check the bot's latency.")
 async def ping(ctx):
-    pingtime = time.time()
-    async with ctx.typing():
-        ping = time.time() - pingtime
-    await ctx.reply(":ping_pong: Latency is `%.01f seconds`" % ping)
+    latency = round(client.latency * 1000)  # latency is in seconds, so we multiply by 1000 to get milliseconds
+    await ctx.reply(f":ping_pong: Latency is `{latency} ms`")
 
 
 @client.command(help="Apply to join Ex Astra.", brief="Apply to join Ex Astra.")
@@ -620,6 +626,18 @@ async def declare_toon(
             return
 
     if player_class is not None and level is not None:
+
+        try:
+            toon_data = get_toon_data(toon)
+            if toon_data:
+                raise ValueError(
+                    f"`{toon.capitalize()}` has previous records, try changing status with `!main`/`!alt` `name`."
+                )
+
+        except Exception as e:
+            await ctx.reply(f"An error occurred while getting the toon data: {str(e)}")
+            return
+
         try:
             insert_to_census(
                 toon, level, player_class, discord_id, status, current_time
@@ -632,14 +650,15 @@ async def declare_toon(
                 )
             owner = toon_rows.iloc[0]
             await ctx.reply(
-                f":white_check_mark:<@{owner}>'s `{toon.capitalize()}` was created and is now a level `{level}` `{player_class}` `{status}`"
+                f":white_check_mark:<@{owner}>'s `{toon.capitalize()}` was entered into the census and is now a level `{level}` `{player_class}` `{status}`"
             )
             return
 
         except Exception as e:
             await ctx.reply(
-                f"An error occurred while inserting toon to census: {str(e)}"
+                f"An error occurred while inserting `{toon.capitalize()}` to census. Probably already exists. Try changing status. {str(e)}"
             )
+
             return
 
     if len(toon_data) == 1:
@@ -782,35 +801,10 @@ async def main(
     ),
 ):
     user_name = format(ctx.author)
-    toon = toon.capitalize()
-    census = get_census()
-    # ... (rest of your code)
-    user_name = format(ctx.author)
-    toon = toon.capitalize()
-    census = get_census()
     try:
-        toon_discord_id = census.loc[census["name"] == toon, "discord_id"].item()
-    except ValueError:
-        user_discord_id = await get_discord_id(ctx, user_name, None)
-        user_mains = census.loc[
-            (census["discord_id"] == user_discord_id) & (census["status"] == "Main"),
-            "name",
-        ].to_list()
-        for i in user_mains:
-            await alt(ctx, i)
-    else:
-        try:
-            toon_mains = census.loc[
-                (census["discord_id"] == toon_discord_id)
-                & (census["status"] == "Main")
-                & (census["name"] != toon),
-                "name",
-            ].to_list()
-            for i in toon_mains:
-                await alt(ctx, i)
-        except ValueError:
-            pass
-    await declare_toon(ctx, "Main", toon, level, player_class, user_name)
+        await declare_toon(ctx, "Main", toon, level, player_class, user_name)
+    except ValueError as e:
+        await ctx.reply(f"Error: {e}")
 
 
 @client.command(
@@ -1042,6 +1036,7 @@ async def ding(
         )
         session.execute(stmt)
         session.commit()
+        session.close()
 
         # Choose the symbol based on whether the new level is higher or lower than the current level
         symbol = (
@@ -1055,13 +1050,12 @@ async def ding(
         command = client.get_command("ask")
         await ctx.invoke(command, question=question)
 
-
     except Exception as e:
         # pass
         await ctx.reply(content=f":x: An error occurred: {str(e)}")
 
     finally:
-        session.close()
+        pass
 
     # await ctx.reply(message_content)
 
@@ -1920,6 +1914,14 @@ async def find(ctx, *, stuff):
 @commands.has_role("Treasurer")
 async def bank(ctx):
 
+    if ctx.message.attachments:
+        attachment = ctx.message.attachments[0]
+    else:
+        await ctx.reply(
+            "No attachment found in the message. Try attaching a banker's inventory with `!bank`."
+        )
+        return
+
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     engine = sqlalchemy.create_engine(config.db_url, echo=False)
 
@@ -1928,6 +1930,12 @@ async def bank(ctx):
     inventory_keyword = Path(attachment.url).stem.split("-")[1]
 
     await ctx.reply(f"Parsing `{inventory_keyword}` for `{banker_name}`")
+
+    old_data = pd.read_sql(
+        "SELECT name, quantity FROM bank WHERE Banker = ?",
+        engine,
+        params=[(banker_name,)],
+    )
 
     req = Request(attachment.url, headers={"User-Agent": "Mozilla/5.0"})
     stream = urlopen(req).read()
@@ -1947,6 +1955,41 @@ async def bank(ctx):
 
     inventory.insert(0, "Time", current_time)
 
+    # Sum up the quantities for each item in the old data
+    old_data = old_data.groupby("name")["quantity"].sum().reset_index()
+
+    # Sum up the quantities for each item in the new data
+    new_data = inventory.groupby("name")["quantity"].sum().reset_index()
+
+    # Merge the old and new data on the item name, keeping all items
+    merged_data = pd.merge(
+        old_data, new_data, on="name", how="outer", suffixes=("_old", "_new")
+    )
+
+    # Calculate the difference in quantity for each item
+    merged_data["quantity_diff"] = (
+        merged_data["quantity_new"] - merged_data["quantity_old"]
+    )
+
+    # Replace NaN values with 0 in 'quantity_old' and 'quantity_new' columns and convert to integer
+    merged_data["quantity_old"] = merged_data["quantity_old"].fillna(0)
+    merged_data["quantity_new"] = merged_data["quantity_new"].fillna(0)
+
+    # Downcast the data
+    merged_data = merged_data.convert_dtypes()
+
+    # Calculate the difference in quantity for each item
+    merged_data["quantity_diff"] = (
+        merged_data["quantity_new"] - merged_data["quantity_old"]
+    )
+
+    merged_data["quantity_diff"] = merged_data["quantity_diff"]
+
+    merged_data = merged_data[["name", "quantity_old", "quantity_new", "quantity_diff"]]
+
+    # filter where the difference is not zero
+    merged_data = merged_data[merged_data["quantity_diff"] != 0]
+
     sql_response = "DELETE FROM bank WHERE banker == ?"
 
     cur.execute(sql_response, (banker_name,))
@@ -1954,9 +1997,36 @@ async def bank(ctx):
 
     inventory.to_sql("bank", engine, if_exists="append", index=False)
 
+    if merged_data.empty:
+        await ctx.reply(
+            f"No changes detected for `{banker_name}`. But thanks for the update!"
+        )
+
+    else:
+        await ctx.reply(f"Changes detected for `{banker_name}`. Here's the summary.")
+
+        # rename to "Item", "Old Quantity", "New Quantity", "Difference"
+        merged_data.columns = ["Item", "Old Quantity", "New Quantity", "Difference"]
+
+        # Convert the differences to a string
+        diff_string = merged_data.to_string(index=False)
+
+        # Split the string into lines
+        lines = diff_string.split("\n")
+
+        # Add a line separator after the header
+        lines.insert(1, "-" * len(lines[0]))
+
+        # Join the lines back into a string
+        diff_string = "\n".join(lines)
+
+        diff_strings = chunk_strings(diff_string)
+
+        for diff_string in diff_strings:
+            await ctx.reply(f"```{diff_string}```")
+
 
 @client.command()
-@commands.has_role("Treasurer")
 async def banktotals(ctx, stuff=None):
 
     view = discord.ui.View(timeout=None)
@@ -2358,8 +2428,6 @@ def build_sell_embed(name, banker, banker_results):
     return search_embed
 
 
-
-
 @client.command()
 async def ask(ctx, *, question):
     print(f"question: {question}")
@@ -2385,22 +2453,6 @@ async def ask(ctx, *, question):
 
         for chunk in chunks:
             await ctx.reply(chunk)
-
-        # # Read the existing data from the JSON file
-        # if os.path.exists('lore_cache.json'):
-        #     with open('lore_cache.json', 'r') as f:
-        #         data = json.load(f)
-        # else:
-        #     data = {}
-
-        # # Update the data with the new question and related strings
-        # data[question] = related_strings
-
-        # # Write the updated data to the JSON file
-        # with open('lore_cache.json', 'w') as f:
-        #     json.dump(data, f, indent=4)
-            
-        # print(related_strings)
 
 
 async def async_openai_call(messages):
