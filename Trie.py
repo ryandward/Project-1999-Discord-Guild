@@ -1,4 +1,13 @@
 class Trie:
+    ...
+    def contains(self, key):
+        node = self.root
+        for char in key:
+            if char in node.children:
+                node = node.children[char]
+            else:
+                return False
+        return node.is_end_of_word
     class Node:
         def __init__(self):
             self.children = {}
