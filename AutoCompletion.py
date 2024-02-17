@@ -7,16 +7,29 @@ from Trie import Trie
 
 
 class AutoCompletion:
-    def __init__(self, async_session_factory, table, choice_transformer):
-        self.root = Trie()  # Trie root node from previous examples
-        self.cache_timestamps = {}  # Cache timestamps for freshness check
-        self.AsyncSession = async_session_factory  # Async session factory for database access
-        self.table = table  # Database table for autocomplete queries
-        self.choice_transformer = choice_transformer  # Function to transform db rows into choices
+    def __init__(
+        self,
+        async_session_factory,
+        table,
+        choice_transformer,
+        max_choices=25,
+        cache_lifetime=60,
+        search_column="name",
+    ):
+        self.root = Trie()
+        self.cache_timestamps = {}
+        self.AsyncSession = async_session_factory
+        self.table = table
+        self.choice_transformer = choice_transformer
+        self.max_choices = max_choices
+        self.cache_lifetime = cache_lifetime
+        self.search_column = search_column
 
     async def query_database(self, current):
         async with self.AsyncSession() as session:
-            stmt = select(self.table.name).where(self.table.name.ilike(f"%{current}%"))
+            stmt = select(getattr(self.table, self.search_column)).where(
+                getattr(self.table, self.search_column).ilike(f"%{current}%")
+            )
             results = await session.execute(stmt)
             return results.scalars().all()
 
@@ -29,23 +42,32 @@ class AutoCompletion:
 
         logger.info(f"Autocomplete requested for '{current}'.")
 
-        if current in self.cache_timestamps and now - self.cache_timestamps[current] < 60:
-            choices = self.root.search(current)
+        if (
+            current in self.cache_timestamps
+            and now - self.cache_timestamps[current] < self.cache_lifetime
+        ):
+            choices = self.root.search(current.lower())
             if choices:
-                logger.info(f"Cache hit for '{current}'. {len(choices)} choices returned after filtering.")
-                return choices[:25]
+                logger.info(
+                    f"Cache hit for '{current}'. {len(choices)} choices returned after filtering."
+                )
+                return choices[: self.max_choices]
 
         logger.info(f"No suitable cache found for '{current}'. Querying database.")
         choices = await self.query_database(current)
         transformed_choices = [self.choice_transformer(row) for row in choices]
 
         for choice in transformed_choices:
-            self.root.insert(choice.name.lower(), choice)
+            if not self.root.contains(choice.name.lower()):
+                self.root.insert(choice.name.lower(), choice)
 
-        self.cache_timestamps[current] = now
-        logger.info(f"Database query completed and trie updated for '{current}'. {len(transformed_choices)} choices fetched.")
+        self.cache_timestamps[current.lower()] = now
+        logger.info(
+            f"Database query completed and trie updated for '{current}'. {len(transformed_choices)} choices fetched."
+        )
 
-        return transformed_choices[:25]
-    
+        return transformed_choices[: self.max_choices]
+
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
