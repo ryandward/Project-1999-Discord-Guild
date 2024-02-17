@@ -10,9 +10,7 @@ logger = logging.getLogger(__name__)
 
 
 class DBConnectionManager:
-    def __init__(
-        self, db_url, search_column="name", format=general_format
-    ):
+    def __init__(self, db_url, search_column="name", format=general_format):
         self.engine = create_async_engine(db_url, echo=False)
         self.AsyncSession = sessionmaker(
             bind=self.engine, class_=AsyncSession, expire_on_commit=False
