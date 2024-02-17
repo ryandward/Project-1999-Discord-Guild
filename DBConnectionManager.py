@@ -2,8 +2,7 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.automap import automap_base
 from collections import defaultdict
-import asyncio
-from choice_transformer import DiscordChoiceTransformer, item_format
+from choice_transformer import DiscordChoiceTransformer, item_format, general_format
 from AutoCompletion import AutoCompletion
 import logging
 
@@ -12,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 class DBConnectionManager:
     def __init__(
-        self, db_url, search_column="name", format=item_format
+        self, db_url, search_column="name", format=general_format
     ):
         self.engine = create_async_engine(db_url, echo=False)
         self.AsyncSession = sessionmaker(
