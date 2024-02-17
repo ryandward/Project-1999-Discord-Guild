@@ -8,7 +8,7 @@ class DeleteButton(
     def __init__(self, user_id: int) -> None:
         super().__init__(
             discord.ui.Button(
-                label="Delete Response",
+                label="Delete",
                 style=discord.ButtonStyle.danger,
                 custom_id=f"delete:user:{user_id}",
             )
@@ -42,7 +42,7 @@ class DMButton(
     def __init__(self, user_id: int) -> None:
         super().__init__(
             discord.ui.Button(
-                label="DM Response",
+                label="DM",
                 style=discord.ButtonStyle.primary,
                 custom_id=f"DM:user:{user_id}",
             )

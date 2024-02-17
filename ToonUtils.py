@@ -1,5 +1,6 @@
 from AutoCompletion import AutoCompletion
 from Buttons import DMButton, DeleteButton
+from RichLogger import RichLogger
 from config import pgdata, pghost, pgpass, pguser
 import logging
 
@@ -17,8 +18,7 @@ import asyncio
 from collections import defaultdict
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = RichLogger(__name__)
 
 
 class ToonUtils(commands.Cog):
@@ -33,7 +33,7 @@ class ToonUtils(commands.Cog):
         self.AsyncSession = sessionmaker(
             bind=self.engine, class_=AsyncSession, expire_on_commit=False
         )
-        
+
         # Initialize cache placeholder
         self.auto_completer = None
 
@@ -48,7 +48,7 @@ class ToonUtils(commands.Cog):
             self.tables = defaultdict()
             for table_name in Base.classes.keys():
                 self.tables[table_name] = Base.classes[table_name]
-                
+
             # Initialize AutoCompletion after tables are prepared
             self.initialize_auto_completer()
 
@@ -58,7 +58,10 @@ class ToonUtils(commands.Cog):
             self.auto_completer = AutoCompletion(
                 async_session_factory=self.AsyncSession,
                 table=self.tables["census"],
-                choice_transformer=lambda row: discord.app_commands.Choice(name=row, value=row)
+                choice_transformer=lambda row: discord.app_commands.Choice(
+                    name=row[0], value=row[0]
+                ),
+                search_column="name",
             )
 
     async def toon_autocomplete(self, interaction: discord.Interaction, current: str):
@@ -104,4 +107,3 @@ class ToonUtils(commands.Cog):
             f"{toons_list}",
             view=self.create_cog_view(interaction.user.id),
         )
-

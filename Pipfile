@@ -47,6 +47,10 @@ pypandoc = "*"
 colorlog = "*"
 psycopg2 = "*"
 asyncpg = "*"
+pynacl = "*"
+rich = "*"
+babel = "*"
+polars = "*"
 
 [dev-packages]
 pylint = "*"
