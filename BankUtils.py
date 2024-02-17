@@ -1,7 +1,7 @@
 from AutoCompletion import AutoCompletion
 from Buttons import DMButton, DeleteButton
 from RichLogger import RichLogger
-from choice_transformer import DiscordChoiceTransformer, item_format, general_format
+from choice_transformer import item_format
 from AutoCompletion import AutoCompletion
 from DBConnectionManager import DBConnectionManager
 
