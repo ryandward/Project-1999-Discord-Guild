@@ -25,6 +25,8 @@ const logger = winston.createLogger({
 
 
 // 2. Database Utilities
+
+// Interfaces used by DatabaseUtils
 interface Row {
   [key: string]: any | null;
 }
@@ -82,8 +84,13 @@ const DatabaseUtils = {
   }
 };
 
-// Initialize DatabaseUtils with the db connection
-const databaseUtils = Object.create(DatabaseUtils).init(db);
+// Interfaces used by other modules from DatabaseUtils
+interface Suggestion {
+  name: string;
+  value: string;
+}
+
+
 
 // 3. Bank Utilities
 interface Item {
@@ -92,46 +99,40 @@ interface Item {
   location: string;
 }
 
-interface Suggestion {
-  name: string;
-  value: string;
-}
 
 const BankUtils = {
-  dbUtils: databaseUtils,
+  dbUtils: Object.create(DatabaseUtils).init(db),
 
-  commandDetails: [
+  // Internal helper functions
+  async search(itemName: string) {
+    const tableName = 'bank';
+    const searchColumn = 'name';
+    return await this.dbUtils.getRows(tableName, searchColumn, itemName);
+  },
+
+  async suggest(partialName: string) {
+    const tableName = 'bank';
+    const searchColumn = 'name';
+    return await this.dbUtils.getSuggestionsAndCount(tableName, searchColumn, partialName);
+  },
+
+  // Command definitions
+  commands: [
     {
       name: 'find_test',
       description: 'Searches for an item in the bank.',
       options: [
         {
           name: 'item',
-          type: 3, // Discord API string type
+          type: 3, // Assuming this is the correct type for a string
           description: 'The item to search for',
           required: true,
           autocomplete: true,
         },
       ],
-    },
-    // Additional commands related to "bank" can be listed here
-  ],
 
-  async search(itemName: string) {
-    const tableName = 'bank';
-    const searchColumn = 'name';
-    return await BankUtils.dbUtils.getRows(tableName, searchColumn, itemName);
-  },
-
-  async suggest(partialName: string) {
-    const tableName = 'bank';
-    const searchColumn = 'name';
-    return await BankUtils.dbUtils.getSuggestionsAndCount(tableName, searchColumn, partialName);
-  },
-
-  commands: {
-    search: {
-      async execute(interaction: CommandInteraction) {
+      // Command handlers
+      execute: async (interaction: CommandInteraction) => {
         const itemName = (interaction.options as CommandInteractionOptionResolver).getString('item');
 
         if (!itemName) {
@@ -146,28 +147,26 @@ const BankUtils = {
         if (allQuantitiesAreOne) {
           headers = ["Banker", "Location"];
           data = items.map((item: Item) => [item.banker, item.location]);
-        }
-        else {
+        } else {
           headers = ["Banker", "Quantity", "Location"];
-          data = items.map((item: Item) => [item.banker, item.quantity, item.location]);
+          data = items.map((item: Item) => [item.banker, item.quantity.toString(), item.location]);
         }
         const t = table([headers, ...data]);
         await interaction.reply(`:white_check_mark: \`${itemName}\` was found in the bank.` + `\`\`\`\n${t}\n\`\`\``);
-
       },
-
-      async autocomplete(interaction: AutocompleteInteraction) {
-        const partialName = interaction.options.getFocused();
+      autocomplete: async (interaction: AutocompleteInteraction) => {
+        const partialName = interaction.options.getFocused(true).value;
         const suggestions = await BankUtils.suggest(partialName);
         await interaction.respond(suggestions.map((suggestion: Suggestion) => ({ name: suggestion.name, value: suggestion.value })));
       },
-    },
-    // Additional commands specific to the Bank context 
-  },
+    }, // find_test
+    // Additional commands can be added in a similar manner
+  ]
 };
 
 
-// 4. Discord Client Initialization and Event Handlers
+// 4. Client Initialization
+
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
 client.on('ready', () => {
@@ -176,47 +175,48 @@ client.on('ready', () => {
   }
 });
 
+// 5. Command Registration
 
+// Define the Command interface
 interface Command {
+  options: any[];
+  description: any;
+  name: string;
   execute: (interaction: CommandInteraction<CacheType>) => Promise<void>;
   autocomplete?: (interaction: AutocompleteInteraction<CacheType>) => Promise<void>;
+  buttons?: (interaction: CommandInteraction<CacheType>) => Promise<void>;
 }
 
-interface CommandRegistry {
-  [commandName: string]: Command;
-}
-
-const commandRegistry: CommandRegistry = {
-  find_test: BankUtils.commands.search,
-  // Future commands
+// Create a command registry
+const commandRegistry: { [moduleName: string]: Command[] } = {
+  BankUtils: BankUtils.commands,
+  // Add other modules here...
 };
+// Flatten the command registry to get all commands
+const allCommands = Object.values(commandRegistry).flat();
 
+
+// 6. Event Handlers
+  
 client.on('interactionCreate', async (interaction: Interaction) => {
-  try {
-    if (!interaction.isCommand() && !interaction.isAutocomplete()) {
-      return;
-    }
+  if (!interaction.isCommand() && !interaction.isAutocomplete()) return;
 
-    const command = commandRegistry[interaction.commandName];
+  // Finding the command within the registry that matches the interaction
+  const command = allCommands.find(cmd => cmd.name === interaction.commandName);
     if (!command) {
-      logger.warn(`No handler found for: ${interaction.commandName}`);
-      return;
-    }
+    logger.warn(`No handler found for: ${interaction.commandName}`);
+    return;
+  }
 
-    if (interaction.isCommand()) {
-      await command.execute(interaction);
-    } else if (interaction.isAutocomplete() && command.autocomplete) {
-      await command.autocomplete(interaction);
-    }
-  } catch (error) {
-    logger.error('Error handling interaction:', error);
-    // Optionally, inform the user an error occurred if appropriate
+  if (interaction.isCommand() && command.execute) {
+    await command.execute(interaction);
+  } else if (interaction.isAutocomplete() && command.autocomplete) {
+    await command.autocomplete(interaction);
   }
 });
 
-// 5. Command Registration and Bot Login
+// 7. Bot Initialization
 logger.info('Started refreshing application (/) commands.');
-
 
 let rest: REST | undefined;
 
@@ -234,12 +234,22 @@ if (!process.env.BOT_SELF || !process.env.GUILD_ID) {
   throw new Error('Required environment variables are not set');
 }
 
+
+// 8. Registering the commands
+
+function getCommandDetails(commands: Command[]) {
+  return commands.map(cmd => ({
+    name: cmd.name,
+    description: cmd.description,
+    options: cmd.options || [],
+  }));
+}
 await rest.put(
   Routes.applicationGuildCommands(process.env.BOT_SELF, process.env.GUILD_ID),
-  { body: BankUtils.commandDetails }
+  { body: getCommandDetails(allCommands) }
 );
 
 logger.info('Successfully reloaded application (/) commands.');
 
-// Log in to the Discord client
+// 9. Login to Discord
 await client.login(process.env.DISCORD_TOKEN);
