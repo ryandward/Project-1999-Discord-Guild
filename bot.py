@@ -166,8 +166,7 @@ def chunk_strings(s, limit=1900):
     return chunks
 
 
-con = psycopg2.connect(dbname=PGDATA, user=PGUSER,
-                       password=PGPASS, host=PGHOST)
+con = psycopg2.connect(dbname=PGDATA, user=PGUSER, password=PGPASS, host=PGHOST)
 cur = con.cursor()
 
 
@@ -177,8 +176,7 @@ def close_connection():
         con.close()
 
 
-player_classes = pd.read_sql_query(
-    "SELECT * FROM class_definitions", POSTGRES_URL)
+player_classes = pd.read_sql_query("SELECT * FROM class_definitions", POSTGRES_URL)
 raids = pd.read_sql_query("SELECT * FROM raids", POSTGRES_URL)
 
 
@@ -238,7 +236,6 @@ class DMButton(
         )
         self.user_id: int = user_id
 
-    # This is called when the button is clicked and the custom_id matches the template.
     @classmethod
     async def from_custom_id(
         cls,
@@ -250,17 +247,19 @@ class DMButton(
         user_id = int(match["id"])
         return cls(user_id)
 
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        # Only allow the user who created the button to interact with it.
-        return interaction.user.id == self.user_id
+    # Removed the interaction_check method to handle permission check within callback
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        # Check if the user is authorized to use the DM button
         if interaction.user.id != self.user_id:
+            # If not authorized, send a customized error message
             await interaction.response.send_message(
-                "This doesn't seem to be your message to DM... :thinking:", ephemeral=True
+                "This doesn't seem to be your message to DM... :thinking:",
+                ephemeral=True,
             )
             return
-        # retrieve message contents, attachments, and embeds
+
+        # Proceed with the intended action if the user is authorized
         message = interaction.message
         message_content = message.content
         message_attachments = []
@@ -273,7 +272,7 @@ class DMButton(
         await interaction.user.send(
             content=message_content, files=message_attachments, embeds=message_embeds
         )
-        await interaction.followup.send_message("DM sent!", ephemeral=True)
+        await interaction.followup.send("DM sent!", ephemeral=True)
 
 
 class PersistentViewBot(commands.Bot):
@@ -284,9 +283,7 @@ class PersistentViewBot(commands.Bot):
         intents.members = True
 
         super().__init__(
-            command_prefix=config.PREFIX,
-            intents=intents,
-            case_insensitive=True
+            command_prefix=config.PREFIX, intents=intents, case_insensitive=True
         )
 
     async def setup_hook(self) -> None:
@@ -308,13 +305,15 @@ async def globally_block_dms(ctx):
     return ctx.guild is not None or ctx.author.id == 816198379344232488
 
 
-@client.command()
+@client.command(
+    help="Pings the bot to check if it's online and respond with round-trip latency.",
+    brief="Pings the bot to check if it's online.",
+)
 async def ping(ctx):
     # Send a message and store the sent message object
     sent = await ctx.send(":arrow_right: Pinging...")
     # Calculate the roundtrip latency
-    latency = round(
-        (sent.created_at - ctx.message.created_at).total_seconds() * 1000)
+    latency = round((sent.created_at - ctx.message.created_at).total_seconds() * 1000)
     # Edit the sent message with the latency
     await sent.edit(content=f":arrows_clockwise: Roundtrip latency: {latency}ms")
 
@@ -326,8 +325,7 @@ async def apply(ctx):
     discord_id = str(ctx.author.id)
     channel = client.get_channel(988260644056879194)  # census chat
     member = await ctx.guild.fetch_member(discord_id)
-    applicant_role = ctx.guild.get_role(
-        990817141831901234)  # come back to this
+    applicant_role = ctx.guild.get_role(990817141831901234)  # come back to this
 
     await member.add_roles(applicant_role)
 
@@ -346,8 +344,7 @@ async def deduct(
     amount: int = commands.parameter(description="The amount to deduct."),
     name: str = commands.parameter(description="The name of the toon."),
     *,
-    args: str = commands.parameter(
-        description="The reason/item for the deduction."),
+    args: str = commands.parameter(description="The reason/item for the deduction."),
 ):
 
     # # Initialize engine and session as before
@@ -360,7 +357,7 @@ async def deduct(
     DBase = declarative_base()
 
     class Items(DBase):
-        __tablename__ = 'items'
+        __tablename__ = "items"
         id = Column(Integer, primary_key=True)
         name = Column(String)
         date = Column(DateTime)
@@ -369,7 +366,7 @@ async def deduct(
         discord_id = Column(String)
 
     class Dkp(DBase):
-        __tablename__ = 'dkp'
+        __tablename__ = "dkp"
         id = Column(Integer, primary_key=True)
         discord_name = Column(String)
         earned_dkp = Column(Integer)
@@ -378,7 +375,7 @@ async def deduct(
         discord_id = Column(String)
 
     class Census(DBase):
-        __tablename__ = 'census'
+        __tablename__ = "census"
         id = Column(Integer, primary_key=True)
         name = Column(String)
         level = Column(Integer)
@@ -395,8 +392,9 @@ async def deduct(
         try:
             # Query for the discord_id from the census table where the name matches
             discord_id_result = (
-                session.query(Census.discord_id).filter(
-                    Census.name == name).one_or_none()
+                session.query(Census.discord_id)
+                .filter(Census.name == name)
+                .one_or_none()
             )
 
             if discord_id_result is None:
@@ -407,8 +405,7 @@ async def deduct(
             discord_id = discord_id_result[0]
 
             # Query for earned_dkp and spent_dkp from the dkp table where the discord_id matches
-            dkp_record = session.query(Dkp).filter(
-                Dkp.discord_id == discord_id).one()
+            dkp_record = session.query(Dkp).filter(Dkp.discord_id == discord_id).one()
             current_dkp = dkp_record.earned_dkp - dkp_record.spent_dkp
 
             if current_dkp >= amount:
@@ -444,6 +441,8 @@ async def deduct(
         finally:
             # Close the session
             session.close()
+
+
 ################################################################################
 
 
@@ -474,8 +473,7 @@ async def award(
     try:
         # Query for the discord_id from the census table where the name matches
         discord_id_result = (
-            session.query(Census.discord_id).filter(
-                Census.name == name).one_or_none()
+            session.query(Census.discord_id).filter(Census.name == name).one_or_none()
         )
 
         if discord_id_result is None:
@@ -564,8 +562,7 @@ async def get_player_class(player_class):
     player_class_names = player_classes["class_name"].to_list()
     player_class_name = gcm(player_class, player_class_names, n=1, cutoff=0.5)
     if len(player_class_name) == 0:
-        raise ValueError(
-            "Invalid player class. Please provide a valid player class.")
+        raise ValueError("Invalid player class. Please provide a valid player class.")
     else:
         player_class_name = player_class_name[0]
         player_class = player_classes.loc[
@@ -608,8 +605,7 @@ def update_census(toon, status, level, player_class, current_time):
     else:
         cur.execute(
             "UPDATE census SET status = %s, level = %s, character_class = %s, time = %s WHERE name = %s,",
-            (status.capitalize(), level, player_class,
-             current_time, toon.capitalize()),
+            (status.capitalize(), level, player_class, current_time, toon.capitalize()),
         )
     con.commit()
 
@@ -799,8 +795,7 @@ async def promote(
 
         channel = client.get_channel(851549677815070751)  # census chat
         member = await ctx.guild.fetch_member(discord_id)
-        probationary_role = ctx.guild.get_role(
-            884172643702546473)  # come back to this
+        probationary_role = ctx.guild.get_role(884172643702546473)  # come back to this
         member_role = ctx.guild.get_role(870669705646587924)
 
         await member.remove_roles(probationary_role)
@@ -818,18 +813,18 @@ async def promote(
         await ctx.reply(f"An error occurred while promoting {name}. Error message: {e}")
 
 
-@client.command(
-    help="Assign someone's discord. Use /assign instead.",
-    brief="Assign someone's discord. Use /assign instead.",
-)
-@commands.has_role("Officer")
-async def assign(ctx):
-    await ctx.reply(
-        f"This command is now a slash command. "
-        f"Please use `/assign` instead. "
-        f"Pay careful attention to check if the toon already exists in the `toon` command build autocomplete. "
-        f"Also note hitting the `Tab` key will autocomplete fields in a way that will greatly reduce errors. "
-    )
+# @client.command(
+#     help="Assign someone's discord. Use /assign instead.",
+#     brief="Assign someone's discord. Use /assign instead.",
+# )
+# @commands.has_role("Officer")
+# async def assign(ctx):
+#     await ctx.reply(
+#         f"This command is now a slash command. "
+#         f"Please use `/assign` instead. "
+#         f"Pay careful attention to check if the toon already exists in the `toon` command build autocomplete. "
+#         f"Also note hitting the `Tab` key will autocomplete fields in a way that will greatly reduce errors. "
+#     )
 
 
 @client.command(
@@ -856,8 +851,8 @@ async def main(
 
 
 @client.command(
-    help="Assigns or switches a bot character for a user.",
-    brief="Assigns or switches a bot character for a user",
+    help="Sets or changes a bot character for a user. Usage: !bot <character> [level] [class]",
+    brief="Sets or changes your bot character",
 )
 async def bot(
     ctx,
@@ -879,8 +874,8 @@ async def bot(
 
 
 @client.command(
-    help="Assigns or switches an alt character for a user.",
-    brief="Assigns or switches an alt character for a user",
+    help="Sets or changes an alternate character for a user. Usage: !alt <character> [level] [class]",
+    brief="Sets or changes your alternate character",
 )
 async def alt(
     ctx,
@@ -902,13 +897,12 @@ async def alt(
 
 
 @client.command(
-    help="Drops a character for a user. Usage: !drop <toon> [level] [player_class]",
-    brief="Drops a character for a user",
+    help="Removes a character from a user's list. Usage: !drop <character> [level] [class]",
+    brief="Removes a character from your list",
 )
 async def drop(
     ctx,
-    toon: str = commands.parameter(
-        description="The name of the character to drop."),
+    toon: str = commands.parameter(description="The name of the character to drop."),
     level: int = commands.parameter(
         description="The level of the character (optional).", default=None
     ),
@@ -934,17 +928,15 @@ async def drop(
 
 
 @client.command(
-    help="Purges all characters associated with a given character's name. Usage: !purge <toon>",
-    brief="Purges all characters associated with a given character's name",
+    help="Removes all characters associated with a specified character's name. Usage: !purge <character>",
+    brief="Removes all characters linked to a name",
 )
 @commands.has_role("Officer")
 async def purge(
     ctx,
-    toon: str = commands.parameter(
-        description="The name of the character to purge."),
+    toon: str = commands.parameter(description="The name of the character to purge."),
 ):
-    cur.execute("SELECT discord_id FROM census WHERE name = %s;",
-                (toon.capitalize(),))
+    cur.execute("SELECT discord_id FROM census WHERE name = %s;", (toon.capitalize(),))
     rows = cur.fetchall()
     if len(rows) == 0:
         await ctx.reply(
@@ -953,8 +945,7 @@ async def purge(
         return
     discord_id = rows[0][0]
     cur.execute(
-        "SELECT DISTINCT name FROM census WHERE discord_id = %s;", (
-            discord_id,)
+        "SELECT DISTINCT name FROM census WHERE discord_id = %s;", (discord_id,)
     )
     all_toons = cur.fetchall()
     for row in all_toons:
@@ -1001,8 +992,7 @@ async def ding(
 
         # Assuming `session` is your SQLAlchemy session and `user_id` is the ID of the user
 
-        toon_data = session.query(Census).filter_by(
-            name=toon.capitalize()).first()
+        toon_data = session.query(Census).filter_by(name=toon.capitalize()).first()
         toon_owner = toon_data.discord_id
         hours_raided = (
             session.query(Attendance).filter_by(discord_id=toon_owner).count()
@@ -1063,8 +1053,7 @@ async def ding(
 
         # Query the Class_lore table and store the result in a new variable
         class_lore_record = (
-            session.query(Class_lore).filter_by(
-                character_class=player_class).first()
+            session.query(Class_lore).filter_by(character_class=player_class).first()
         )
         player_class = player_class.lower()
 
@@ -1104,54 +1093,54 @@ async def ding(
         pass
 
 
-@client.command(
-    help="Decreases the level of a character by 1. Usage: !dong <toon>",
-    brief="Decreases the level of a character",
-)
-async def dong(
-    ctx,
-    toon: str = commands.parameter(
-        description="The name of the character whose level is to be decreased."
-    ),
-):
-    try:
-        engine = create_engine(POSTGRES_URL, echo=False)
-        Session = sessionmaker(bind=engine)
-        session = Session()
+# @client.command(
+#     help="Decreases the level of a character by 1. Usage: !dong <toon>",
+#     brief="Decreases the level of a character",
+# )
+# async def dong(
+#     ctx,
+#     toon: str = commands.parameter(
+#         description="The name of the character whose level is to be decreased."
+#     ),
+# ):
+#     try:
+#         engine = create_engine(POSTGRES_URL, echo=False)
+#         Session = sessionmaker(bind=engine)
+#         session = Session()
 
-        # Reflect the tables
-        Base = automap_base()
-        Base.prepare(autoload_with=engine)
+#         # Reflect the tables
+#         Base = automap_base()
+#         Base.prepare(autoload_with=engine)
 
-        # Mapped classes are now created with names by default
-        # matching that of the table name.
-        Census = Base.classes.census
+#         # Mapped classes are now created with names by default
+#         # matching that of the table name.
+#         Census = Base.classes.census
 
-        toon_data = session.query(Census).filter_by(
-            name=toon.capitalize()).first()
-        toon_owner = toon_data.discord_id
+#         toon_data = session.query(Census).filter_by(
+#             name=toon.capitalize()).first()
+#         toon_owner = toon_data.discord_id
 
-        if toon_data is None:
-            await ctx.reply(f":x: `{toon.capitalize()}` was not found.")
-            return
+#         if toon_data is None:
+#             await ctx.reply(f":x: `{toon.capitalize()}` was not found.")
+#             return
 
-        current_level = toon_data.level
+#         current_level = toon_data.level
 
-        if current_level == 1:
-            await ctx.reply(
-                f":level_slider: <@{toon_owner}>'s `{toon.capitalize()}` is already at the lowest level `{current_level}`!"
-            )
-            return
+#         if current_level == 1:
+#             await ctx.reply(
+#                 f":level_slider: <@{toon_owner}>'s `{toon.capitalize()}` is already at the lowest level `{current_level}`!"
+#             )
+#             return
 
-        new_level = current_level - 1
+#         new_level = current_level - 1
 
-        # Invoke the ding command with the new level
-        await ctx.invoke(client.get_command("ding"), toon=toon, new_level=new_level)
+#         # Invoke the ding command with the new level
+#         await ctx.invoke(client.get_command("ding"), toon=toon, new_level=new_level)
 
-    except Exception as e:
-        await ctx.reply(content=f":x: An error occurred: {str(e)}")
-    finally:
-        session.close()
+#     except Exception as e:
+#         await ctx.reply(content=f":x: An error occurred: {str(e)}")
+#     finally:
+#         session.close()
 
 
 def create_toons_embed(owner, toons):
@@ -1186,15 +1175,13 @@ def create_toons_embed(owner, toons):
 
             embed.add_field(
                 name=":crossed_swords:️ Class",
-                value="```\n" +
-                "\n".join(toons.character_class.tolist()) + "\n```",
+                value="```\n" + "\n".join(toons.character_class.tolist()) + "\n```",
                 inline=True,
             )
 
             embed.add_field(
                 name=":arrow_double_up: Level",
-                value="```\n" +
-                "\n".join(map(str, toons.level.tolist())) + "\n```",
+                value="```\n" + "\n".join(map(str, toons.level.tolist())) + "\n```",
                 inline=True,
             )
 
@@ -1206,8 +1193,8 @@ def create_toons_embed(owner, toons):
 
 
 @client.command(
-    help="Displays information about a character or all characters if no character is specified. Usage: !toons [toon]",
-    brief="Displays information about a character or all characters",
+    help="Shows details about a specified character or all of a user's characters. Usage: !toons [character]",
+    brief="Shows character details",
 )
 async def toons(
     ctx,
@@ -1235,8 +1222,7 @@ async def toons(
         else:
             try:
                 toon_data = (
-                    session.query(Census).filter_by(
-                        name=toon.capitalize()).first()
+                    session.query(Census).filter_by(name=toon.capitalize()).first()
                 )
                 toon_owner = toon_data.discord_id
             except Exception as e:
@@ -1254,8 +1240,7 @@ async def toons(
             )
         discord_id = unique_discord_ids[0]
 
-        toons_list = create_toons_embed(
-            ctx.guild.get_member(int(toon_owner)), toons)
+        toons_list = create_toons_embed(ctx.guild.get_member(int(toon_owner)), toons)
         await ctx.reply(embed=toons_list)
 
     except Exception as e:
@@ -1293,8 +1278,7 @@ async def get_dkp_data(discord_id, toon=None):
         high_level_names = None
 
     else:
-        high_level_names_list = sorted(
-            [f"`{name}`" for name in high_level_names_list])
+        high_level_names_list = sorted([f"`{name}`" for name in high_level_names_list])
 
         high_level_names = list_to_oxford_comma(high_level_names_list)
 
@@ -1347,8 +1331,7 @@ async def dkp(
         str(ctx.author.id), toon
     )
     if not dkp_dict.empty:
-        user = ctx.guild.get_member(
-            int(discord_id)) if discord_id is not None else None
+        user = ctx.guild.get_member(int(discord_id)) if discord_id is not None else None
         dkp_embed = create_dkp_embed(discord_id, dkp_dict, high_level_names)
         await ctx.reply(embed=dkp_embed)
     else:
@@ -1356,10 +1339,8 @@ async def dkp(
 
 
 @client.command(
-    help='Processes raid logs and updates DKP. Can be a reply to posted logs. Usage: !logs <description> followed by logs or a reply to logs. \n\
-        Example 1: "!logs raid" followed by pasted logs from /who. \n\
-        Example 2: "!logs on time" in a reply to a message containing logs.',
-    brief="Processes raid logs and updates DKP",
+    help="Updates DKP based on raid logs. Usage: !logs <description> with logs or as a reply to logs.",
+    brief="Updates DKP from raid logs",
 )
 @commands.has_role("Officer")
 async def logs(
@@ -1426,13 +1407,11 @@ async def logs(
         record = re.sub(" LFG", "", record)
         record = re.sub(" <LINKDEAD>", "", record)
 
-        line = re.compile("(%s|%s|%s|%s)" %
-                          (re1, re2, re3, re4)).findall(record)
+        line = re.compile("(%s|%s|%s|%s)" % (re1, re2, re3, re4)).findall(record)
 
         timestamp = line[0]
 
-        timestamp = datetime.datetime.strptime(
-            timestamp, "%a %b %d %H:%M:%S %Y")
+        timestamp = datetime.datetime.strptime(timestamp, "%a %b %d %H:%M:%S %Y")
 
         timestamp = datetime.datetime.strftime(timestamp, "%Y-%m-%d %H:%M:%S")
 
@@ -1478,8 +1457,7 @@ async def logs(
 
         sql_response = "INSERT INTO attendance (date, raid, name, discord_id, modifier) VALUES (%s, %s, %s, %s, %s);"
 
-        cur.execute(sql_response, (timestamp, raid,
-                    name, discord_id, modifier))
+        cur.execute(sql_response, (timestamp, raid, name, discord_id, modifier))
 
         if cur.rowcount == 1:
             con.commit()
@@ -1604,8 +1582,7 @@ async def sanctum(
         if toon != None:
             toon = toon.capitalize()
             user_name = format(toon)
-            discord_id = census.loc[census["name"]
-                                    == toon, "discord_id"].item()
+            discord_id = census.loc[census["name"] == toon, "discord_id"].item()
 
         inner_merged = pd.merge(
             rap_totals, census, left_on="Name", right_on="name", how="inner"
@@ -1640,8 +1617,7 @@ async def sanctum(
 
             rap_list.add_field(
                 name=":arrow_up:️ DKP",
-                value="```\n" +
-                "\n".join(map(str, rap_totals.RAP.tolist())) + "\n```",
+                value="```\n" + "\n".join(map(str, rap_totals.RAP.tolist())) + "\n```",
                 inline=True,
             )
 
@@ -1720,8 +1696,7 @@ async def inventory(ctx):
                     continue
 
                 # parse the inventory file
-                req = Request(attachment.url, headers={
-                              "User-Agent": "Mozilla/5.0"})
+                req = Request(attachment.url, headers={"User-Agent": "Mozilla/5.0"})
                 stream = urlopen(req).read()
                 inventory_list = pd.read_csv(
                     io.StringIO(stream.decode("utf-8")), sep="\t"
@@ -1740,8 +1715,7 @@ async def inventory(ctx):
                 inventory_list["toon"] = toon_name
                 inventory_list["time"] = current_time
 
-                session.query(Inventory).filter(
-                    Inventory.toon == toon_name).delete()
+                session.query(Inventory).filter(Inventory.toon == toon_name).delete()
                 session.commit()
 
                 inventory_data = inventory_list.to_dict(orient="records")
@@ -1768,8 +1742,8 @@ async def inventory(ctx):
 
 
 @client.command(
-    help="Helps you find your stuff. Usage: !wheresmy [stuff]",
-    brief="Where's my stuff?",
+    help="Keep track of shared bot's inventory. Usage 'wheresmy [item]'",
+    brief="Find an item on a shared bot",
 )
 @commands.has_role("Member")
 async def wheresmy(ctx, *, stuff):
@@ -1798,11 +1772,9 @@ async def wheresmy(ctx, *, stuff):
                 .filter_by(discord_id=str(ctx.author.id))
                 .all()
             )
-            toon_names = [name[0]
-                          for name in toon_names]  # Extract names from tuples
+            toon_names = [name[0] for name in toon_names]  # Extract names from tuples
             trash_items = session.query(Trash.name).all()
-            trash_items = [name[0]
-                           for name in trash_items]  # Extract names from tuples
+            trash_items = [name[0] for name in trash_items]  # Extract names from tuples
 
         except Exception as e:
             await ctx.reply(f":x: An error occurred. {e}")
@@ -1878,8 +1850,7 @@ async def find(ctx, *, stuff):
         # retrieve list of names from Census where discord_id matches the user
         try:
             trash_items = session.query(Trash.name).all()
-            trash_items = [name[0]
-                           for name in trash_items]  # Extract names from tuples
+            trash_items = [name[0] for name in trash_items]  # Extract names from tuples
 
         except Exception as e:
             await ctx.reply(f":x: An error occurred. {e}")
@@ -1917,18 +1888,15 @@ async def find(ctx, *, stuff):
                 banker_items = items[items["banker"] == banker]
 
                 # append the items to the new DataFrame
-                new_items = pd.concat(
-                    [new_items, banker_items], ignore_index=True)
+                new_items = pd.concat([new_items, banker_items], ignore_index=True)
 
                 # if this is not the last banker, add a section break
                 if i < len(unique_bankers) - 1:
                     # calculate the maximum length of each column
                     max_length_banker = banker_items["banker"].str.len().max()
                     max_length_name = banker_items["name"].str.len().max()
-                    max_length_location = banker_items["location"].str.len(
-                    ).max()
-                    max_length_quantity = banker_items["quantity"].str.len(
-                    ).max()
+                    max_length_location = banker_items["location"].str.len().max()
+                    max_length_quantity = banker_items["quantity"].str.len().max()
 
                     # create a DataFrame for the section break
                     section_break = pd.DataFrame(
@@ -1944,8 +1912,7 @@ async def find(ctx, *, stuff):
                     )
 
                     # append the section break to the new DataFrame
-                    new_items = pd.concat(
-                        [new_items, section_break], ignore_index=True)
+                    new_items = pd.concat([new_items, section_break], ignore_index=True)
 
             # replace the original items DataFrame with the new one
             items = new_items
@@ -1956,9 +1923,7 @@ async def find(ctx, *, stuff):
         # check if the search term is in the items
         if items.empty:
             view.response_message = await ctx.reply(
-                f"No matches found for `!find`. You might want to try the `/find` command, "
-                f"which offers autocomplete suggestions from the bank's inventory as you type. "
-                f"Simply type `/find {titlecase(stuff)}` to get started and choose from the available suggestions.",
+                f"No matches found for `{titlecase(stuff)}`.",
                 view=view,
             )
             return
@@ -1983,7 +1948,10 @@ async def find(ctx, *, stuff):
         os.remove(path)
 
 
-@client.command()
+@client.command(
+    help="Update the guild bank with a new inventory. Usage: !bank while uploading an inventory file.",
+    brief="Update the guild bank.",
+)
 @commands.has_role("Treasurer")
 async def bank(ctx):
 
@@ -2059,8 +2027,7 @@ async def bank(ctx):
 
     merged_data["quantity_diff"] = merged_data["quantity_diff"]
 
-    merged_data = merged_data[[
-        "name", "quantity_old", "quantity_new", "quantity_diff"]]
+    merged_data = merged_data[["name", "quantity_old", "quantity_new", "quantity_diff"]]
 
     # filter where the difference is not zero
     merged_data = merged_data[merged_data["quantity_diff"] != 0]
@@ -2095,8 +2062,7 @@ async def bank(ctx):
         )
 
         # rename to "Item", "Old Quantity", "New Quantity", "Difference"
-        merged_data.columns = ["Item", "Old Quantity",
-                               "New Quantity", "Difference"]
+        merged_data.columns = ["Item", "Old Quantity", "New Quantity", "Difference"]
 
         # Convert the differences to a string
         diff_string = merged_data.to_string(index=False)
@@ -2116,7 +2082,10 @@ async def bank(ctx):
             await treasury_channel.send(f"```{diff_string}```")
 
 
-@client.command()
+@client.command(
+    help="Complete data dump of every inventory item on the guild bankers",
+    brief="Single-file output of banker inventory",
+)
 async def banktotals(ctx, stuff=None):
 
     view = discord.ui.View(timeout=None)
@@ -2133,8 +2102,7 @@ async def banktotals(ctx, stuff=None):
     if stuff is None:
         bank = bank[~bank["name"].isin(trash["name"])]
         banktotals = (
-            bank.groupby(["name"])["quantity"].sum().reset_index()[
-                ["quantity", "name"]]
+            bank.groupby(["name"])["quantity"].sum().reset_index()[["quantity", "name"]]
         )
 
     # this query should be case insensitive
@@ -2179,8 +2147,16 @@ async def banktotals(ctx, stuff=None):
     os.remove(path)
 
 
-@client.command()
-async def bidhistory(ctx):
+@client.command(
+    help="Complete data dump of every inventory item on the guild bankers",
+    brief="Single-file output of banker inventory",
+)
+async def banker(ctx, banker_name=None):
+    view = discord.ui.View(timeout=None)
+    view.add_item(
+        DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
+    )
+    view.add_item(DMButton(ctx.author.id))
 
     view = discord.ui.View(timeout=None)
     view.add_item(
@@ -2189,87 +2165,131 @@ async def bidhistory(ctx):
     view.add_item(DMButton(ctx.author.id))
 
     engine = sqlalchemy.create_engine(POSTGRES_URL, echo=False)
-    # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
-    discord_id = str(ctx.author.id)
-    items = pd.read_sql_table("items", con=engine)
-    items = items.loc[items["discord_id"] == discord_id]
-    items = items[["name", "date", "item", "dkp_spent"]]
+    bank = pd.read_sql_table("bank", con=engine)
+    trash = pd.read_sql_table("trash", con=engine)
+    if banker_name is not None:
+        banker_name = banker_name.capitalize()
+    banker_names = bank["banker"].unique()
 
-    # wherever dkp_spent is nan, conver to 0
-    items["dkp_spent"] = items["dkp_spent"].fillna(0)
+    # if stuff is None, then show everything
+    if banker_name is None or banker_name not in banker_names:
 
-    items["dkp_spent"] = items["dkp_spent"].astype(int)
-    # items = items.groupby(['name'])['quantity'].sum().reset_index()[['quantity', 'name']]
+        bankers = bank["banker"].unique()
+        bankers = sorted(bankers)
+        await ctx.reply(
+            f":x: Please specify a banker. Available bankers are: {list_to_oxford_comma(bankers)}"
+        )
 
-    try:
-        file, path = table_to_file(items)
-    except Exception as e:
-        await ctx.reply(f":x: An error occurred. {e}")
-        return
-
-    view.response_message = await ctx.reply(
-        f":moneybag: Here's your bid history.\nRequested by <@{ctx.author.id}>.",
-        file=file,
-        view=view,
-    )
-
-    os.remove(path)
-
-
-@client.command()
-async def dkphistory(ctx):
-
-    view = discord.ui.View(timeout=None)
-    view.add_item(
-        DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
-    )
-    view.add_item(DMButton(ctx.author.id))
-
-    engine = sqlalchemy.create_engine(POSTGRES_URL, echo=False)
-    # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
-    discord_id = str(ctx.author.id)
-    attendance = pd.read_sql_table("attendance", con=engine)
-    attendance = attendance.loc[attendance["discord_id"] == discord_id]
-    attendance = attendance[["name", "date", "raid", "modifier"]]
-    # wherever dkp_spent is nan, conver to 0
-    attendance["modifier"] = attendance["modifier"].fillna(0)
-
-    attendance["modifier"] = attendance["modifier"].astype(int)
-    # items = items.groupby(['name'])['quantity'].sum().reset_index()[['quantity', 'name']]
-
-    try:
-        file, path = table_to_file(attendance)
-    except Exception as e:
-        await ctx.reply(f":x: An error occurred. {e}")
-        return
-
-    view.response_message = await ctx.reply(
-        f":moneybag: Here's your DKP earnings history.",
-        file=file,
-        view=view,
-    )
-
-    os.remove(path)
-
-
-@client.command()
-async def who(ctx, level, optional_max_level=None, player_class=None):
-    level, max_level, player_class = await validate_and_process_input(
-        ctx, level, optional_max_level, player_class
-    )
-    if level is None:
-        return
-    matching_toons = fetch_matching_toons(level, max_level, player_class)
-    if len(matching_toons) == 0:
-        await reply_no_matching_toon(ctx, level, max_level, player_class)
     else:
-        await reply_matching_toons(ctx, matching_toons, level, max_level, player_class)
+        bank = bank[~bank["name"].isin(trash["name"])]
+        bank = bank[bank["banker"] == banker_name]
+        bank = bank.sort_values(["name", "location"], ascending=[True, True])
+
+        try:
+            file, path = table_to_file(bank)
+        except Exception as e:
+            await ctx.reply(f":x: An error occurred. {e}")
+            return
+
+        view.response_message = await ctx.reply(
+            f":moneybag:Here's the bank totals for `{banker_name}`.\nRequested by <@{ctx.author.id}>.",
+            file=file,
+            view=view,
+        )
+
+        os.remove(path)
+
+
+# @client.command()
+# async def bidhistory(ctx):
+
+#     view = discord.ui.View(timeout=None)
+#     view.add_item(
+#         DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
+#     )
+#     view.add_item(DMButton(ctx.author.id))
+
+#     engine = sqlalchemy.create_engine(POSTGRES_URL, echo=False)
+#     # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+#     discord_id = str(ctx.author.id)
+#     items = pd.read_sql_table("items", con=engine)
+#     items = items.loc[items["discord_id"] == discord_id]
+#     items = items[["name", "date", "item", "dkp_spent"]]
+
+#     # wherever dkp_spent is nan, conver to 0
+#     items["dkp_spent"] = items["dkp_spent"].fillna(0)
+
+#     items["dkp_spent"] = items["dkp_spent"].astype(int)
+#     # items = items.groupby(['name'])['quantity'].sum().reset_index()[['quantity', 'name']]
+
+#     try:
+#         file, path = table_to_file(items)
+#     except Exception as e:
+#         await ctx.reply(f":x: An error occurred. {e}")
+#         return
+
+#     view.response_message = await ctx.reply(
+#         f":moneybag: Here's your bid history.\nRequested by <@{ctx.author.id}>.",
+#         file=file,
+#         view=view,
+#     )
+
+#     os.remove(path)
+
+
+# @client.command()
+# async def dkphistory(ctx):
+
+#     view = discord.ui.View(timeout=None)
+#     view.add_item(
+#         DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
+#     )
+#     view.add_item(DMButton(ctx.author.id))
+
+#     engine = sqlalchemy.create_engine(POSTGRES_URL, echo=False)
+#     # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+#     discord_id = str(ctx.author.id)
+#     attendance = pd.read_sql_table("attendance", con=engine)
+#     attendance = attendance.loc[attendance["discord_id"] == discord_id]
+#     attendance = attendance[["name", "date", "raid", "modifier"]]
+#     # wherever dkp_spent is nan, conver to 0
+#     attendance["modifier"] = attendance["modifier"].fillna(0)
+
+#     attendance["modifier"] = attendance["modifier"].astype(int)
+#     # items = items.groupby(['name'])['quantity'].sum().reset_index()[['quantity', 'name']]
+
+#     try:
+#         file, path = table_to_file(attendance)
+#     except Exception as e:
+#         await ctx.reply(f":x: An error occurred. {e}")
+#         return
+
+#     view.response_message = await ctx.reply(
+#         f":moneybag: Here's your DKP earnings history.",
+#         file=file,
+#         view=view,
+#     )
+
+#     os.remove(path)
+
+
+# @client.command()
+# async def who(ctx, level, optional_max_level=None, player_class=None):
+#     level, max_level, player_class = await validate_and_process_input(
+#         ctx, level, optional_max_level, player_class
+#     )
+#     if level is None:
+#         return
+#     matching_toons = fetch_matching_toons(level, max_level, player_class)
+#     if len(matching_toons) == 0:
+#         await reply_no_matching_toon(ctx, level, max_level, player_class)
+#     else:
+#         await reply_matching_toons(ctx, matching_toons, level, max_level, player_class)
 
 
 async def send_split_message(ctx, message):
     max_length = 2000
-    messages = [message[i: i + max_length]
-                for i in range(0, len(message), max_length)]
+    messages = [message[i : i + max_length] for i in range(0, len(message), max_length)]
     for msg in messages:
         await ctx.send(msg)
 
@@ -2306,96 +2326,99 @@ async def validate_and_process_input(ctx, level, optional_max_level, player_clas
     )
 
 
-def fetch_matching_toons(level, max_level, player_class):
-    Base = automap_base()
-    engine = create_engine(POSTGRES_URL)
-    Base.prepare(autoload_with=engine)
+# def fetch_matching_toons(level, max_level, player_class):
+#     Base = automap_base()
+#     engine = create_engine(POSTGRES_URL)
+#     Base.prepare(autoload_with=engine)
 
-    Attendance = Base.classes.attendance
-    Census = Base.classes.census
+#     Attendance = Base.classes.attendance
+#     Census = Base.classes.census
 
-    session = Session(engine)
+#     session = Session(engine)
 
-    toon_q = (
-        session.query(Census)
-        .filter(Census.character_class == player_class)
-        .filter(Census.level >= level)
-        .filter(Census.level <= max_level)
-        .filter(Census.status != "Dropped")
-        .join(Attendance, Attendance.discord_id == Census.discord_id)
-        .having(func.max(Attendance.date))
-        .group_by(Attendance.discord_id)
-        .order_by(Attendance.date.desc())
-    )
+#     toon_q = (
+#         session.query(Census)
+#         .filter(Census.character_class == player_class)
+#         .filter(Census.level >= level)
+#         .filter(Census.level <= max_level)
+#         .filter(Census.status != "Dropped")
+#         .join(Attendance, Attendance.discord_id == Census.discord_id)
+#         .having(func.max(Attendance.date))
+#         .group_by(Attendance.discord_id)
+#         .order_by(Attendance.date.desc())
+#     )
 
-    return pd.read_sql(toon_q.statement, toon_q.session.bind)[
-        ["name", "discord_id", "level"]
-    ]
-
-
-async def reply_no_matching_toon(ctx, level, max_level, player_class):
-    if max_level == level:
-        await ctx.reply(f"There were no level {level} {player_class}s found.")
-    else:
-        await ctx.reply(
-            f"There were no level {level} to {max_level} {player_class}s found."
-        )
+#     return pd.read_sql(toon_q.statement, toon_q.session.bind)[
+#         ["name", "discord_id", "level"]
+#     ]
 
 
-async def reply_matching_toons(ctx, matching_toons, level, max_level, player_class):
-    guild = ctx.guild
-    names = []
-    mentions = []
-    left_server_names = []
-
-    for _, row in matching_toons.iterrows():
-        name = row["name"]
-        discord_id = row["discord_id"]
-        toon_level = row["level"]
-        member = guild.get_member(int(discord_id))
-
-        if member is not None:
-            names.append(name)
-            if toon_level == max_level or toon_level == level:
-                mentions.append((discord_id, toon_level))
-            else:
-                mentions.append((discord_id, f"{toon_level}-{max_level}"))
-        else:
-            left_server_names.append(name)
-
-    embed = discord.Embed(
-        title=f":white_check_mark: Registered level {level} to {max_level} {player_class}s",
-        description="Sorted by most recently earned DKP on any character.",
-        colour=discord.Colour.from_rgb(241, 196, 15),
-    )
-
-    embed.add_field(
-        name=":bust_in_silhouette: Name",
-        value="".join([f"`{name}`\n" for name in names]),
-        inline=True,
-    )
-
-    embed.add_field(
-        name=":busts_in_silhouette: Discord",
-        value="".join(
-            [
-                f"`{' ' if toon_level < 10 else ''}{mention[1]}`<@{mention[0]}>\n"
-                for mention in mentions
-            ]
-        ),
-        inline=True,
-    )
-
-    if left_server_names:
-        left_server_names_str = ", ".join(left_server_names)
-        embed.set_footer(
-            text=f"The following characters appear not to belong to this server anymore:\n{left_server_names_str}"
-        )
-
-    await ctx.reply(embed=embed)
+# async def reply_no_matching_toon(ctx, level, max_level, player_class):
+#     if max_level == level:
+#         await ctx.reply(f"There were no level {level} {player_class}s found.")
+#     else:
+#         await ctx.reply(
+#             f"There were no level {level} to {max_level} {player_class}s found."
+#         )
 
 
-@client.command()
+# async def reply_matching_toons(ctx, matching_toons, level, max_level, player_class):
+#     guild = ctx.guild
+#     names = []
+#     mentions = []
+#     left_server_names = []
+
+#     for _, row in matching_toons.iterrows():
+#         name = row["name"]
+#         discord_id = row["discord_id"]
+#         toon_level = row["level"]
+#         member = guild.get_member(int(discord_id))
+
+#         if member is not None:
+#             names.append(name)
+#             if toon_level == max_level or toon_level == level:
+#                 mentions.append((discord_id, toon_level))
+#             else:
+#                 mentions.append((discord_id, f"{toon_level}-{max_level}"))
+#         else:
+#             left_server_names.append(name)
+
+#     embed = discord.Embed(
+#         title=f":white_check_mark: Registered level {level} to {max_level} {player_class}s",
+#         description="Sorted by most recently earned DKP on any character.",
+#         colour=discord.Colour.from_rgb(241, 196, 15),
+#     )
+
+#     embed.add_field(
+#         name=":bust_in_silhouette: Name",
+#         value="".join([f"`{name}`\n" for name in names]),
+#         inline=True,
+#     )
+
+#     embed.add_field(
+#         name=":busts_in_silhouette: Discord",
+#         value="".join(
+#             [
+#                 f"`{' ' if toon_level < 10 else ''}{mention[1]}`<@{mention[0]}>\n"
+#                 for mention in mentions
+#             ]
+#         ),
+#         inline=True,
+#     )
+
+#     if left_server_names:
+#         left_server_names_str = ", ".join(left_server_names)
+#         embed.set_footer(
+#             text=f"The following characters appear not to belong to this server anymore:\n{left_server_names_str}"
+#         )
+
+#     await ctx.reply(embed=embed)
+
+
+@client.command(
+    help="Takes control of a toon that is currently marked as a 'Bot'. Usage: !claim <toon_name>",
+    brief="Claim a toon.",
+)
 async def claim(ctx, toon):
 
     toon = toon.capitalize()
@@ -2473,64 +2496,25 @@ async def on_command_error(ctx, error):
 ###########
 
 
-async def remove_item_from_bank(id):
-    Base = automap_base()
-    engine = create_engine(POSTGRES_URL)
-    Base.prepare(autoload_with=engine)
-    Bank = Base.classes.bank
-    session = Session(engine)
-
-    try:
-        item_to_delete = session.query(Bank).filter(Bank.id == int(id)).one()
-        session.delete(item_to_delete)
-        session.commit()
-        return True
-    except Exception as e:
-        print(f"Error removing item from bank: {e}")
-        return False
-
-
-def build_sell_embed(name, banker, banker_results):
-    search_embed = discord.Embed(
-        title=f":gem: Treasury Query for `{name}`",
-        description=f"Found on `{banker}`",
-        colour=discord.Colour.from_rgb(241, 196, 15),
-    )
-
-    search_embed.add_field(
-        name="Item Characteristics",
-        value=f"{len(banker_results)} matching item(s) found.",
-        inline=False,
-    )
-
-    search_embed.add_field(
-        name=":1234: ID",
-        value="```\n" +
-        "\n".join(banker_results.id.astype(str).tolist()) + "\n```",
-        inline=True,
-    )
-
-    search_embed.add_field(
-        name=":bust_in_silhouette: Item",
-        value="```\n" + "\n".join(banker_results.name.tolist()) + "\n```",
-        inline=True,
-    )
-
-    search_embed.add_field(
-        name=":arrow_up:️ Quantity",
-        value="```\n" +
-        "\n".join(map(str, banker_results.quantity.tolist())) + "\n```",
-        inline=True,
-    )
-
-    search_embed.set_footer(text="Fetched at local time")
-    search_embed.timestamp = datetime.datetime.now(pytz.timezone("US/Pacific"))
-
-    return search_embed
-
-
-@client.command()
+@client.command(
+    help="Asks a question and provides a response. Usage: !ask <question> [--required_keyword=<value1,value2,...>]",
+    brief="Ask a question and get an answer.",
+)
 async def ask(ctx, *, question):
+    """
+    This command allows users to ask a question and get an answer.
+    The question can include an optional 'required_keyword' argument
+    to pass specific keywords to the downstream function.
+
+    Usage:
+    !ask What is the weather today? --required_keyword=sunny,rainy
+
+    Parameters:
+    - question: The main question being asked.
+    - required_keyword (optional): A comma-separated list of keywords that are required for the response.
+
+    The 'required_keyword' argument is passed as a keyword argument to the downstream function.
+    """
     print(f"question: {question}")
     async with ctx.typing():
         # Splitting the input text into question and additional arguments
@@ -2542,12 +2526,11 @@ async def ask(ctx, *, question):
             # Assuming additional arguments are formatted as 'key=value'
             for arg in parts[1:]:
                 key_value = arg.split("=")
-                if len(key_value) == 2:
+                if len(key_value) == 2 and key_value[0].strip() == "required_keyword":
                     # Split the values by comma and store them in a list
-                    values = [value.strip()
-                              for value in key_value[1].split(",")]
-                    # Always store the values as a list
-                    kwargs[key_value[0].strip()] = values
+                    values = [value.strip() for value in key_value[1].split(",")]
+                    # Store the values as a list under 'required_keyword'
+                    kwargs["required_keyword"] = values
 
         # Call ask_async with parsed kwargs
         response = await ask_async(question, **kwargs)
