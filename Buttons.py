@@ -22,7 +22,6 @@ class DeleteButton(
         interaction: discord.Interaction,
         item: discord.ui.Button,
         match: re.Match[str],
-        /,
     ):
         user_id = int(match["id"])
         return cls(user_id)
@@ -35,7 +34,37 @@ class DeleteButton(
         await interaction.response.send_message("Response deleted!", ephemeral=True)
         await interaction.message.delete()
 
+class RequestButton(
+    discord.ui.DynamicItem[discord.ui.Button], template=r"request:user:(?P<id>[0-9]+):role:(?P<role_id>\w+)"
+):
+    def __init__(self, user_id: int, role_id: int) -> None:
+        super().__init__(
+            discord.ui.Button(
+                label="Request",
+                style=discord.ButtonStyle.success,
+                custom_id=f"request:user:{user_id}:role:{role_id}",
+            )
+        )
+        self.user_id: int = user_id
+        self.role_id: int = role_id
 
+    @classmethod
+    async def from_custom_id(
+        cls,
+        interaction: discord.Interaction,
+        item: discord.ui.Button,
+        match: re.Match[str],
+    ):
+        user_id = int(match["id"])
+        role_id = int(match["role_id"])
+        return cls(user_id, role_id)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        return interaction.user.id == self.user_id
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(f"<@&{self.role_id}> {interaction.user.mention} is making a request for {interaction.message.content}!")
+    
 class DMButton(
     discord.ui.DynamicItem[discord.ui.Button], template=r"DM:user:(?P<id>[0-9]+)"
 ):
