@@ -15,7 +15,7 @@ google-auth==2.6.0
 google-auth-oauthlib==0.4.6
 greenlet==1.1.2
 gspread==5.1.1
-idna==3.3
+idna==3.7
 Mako==1.2.0
 MarkupSafe==2.1.1
 multidict==6.0.2
