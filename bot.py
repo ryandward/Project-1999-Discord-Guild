@@ -144,7 +144,7 @@ def list_to_oxford_comma(names):
         return ", ".join(names[:-1]) + f", and {names[-1]}"
 
 
-def check_reply(ctx):
+def check_send(ctx):
     result = ctx.message.reference
     if result is None:
         return False
@@ -329,7 +329,7 @@ async def apply(ctx):
 
     await member.add_roles(applicant_role)
 
-    await ctx.reply(
+    await ctx.send(
         f"Attention <@&849337092324327454> and <@&906952889287708773>, <@{discord_id}>, has submitted an application."
     )
 
@@ -398,7 +398,7 @@ async def deduct(
             )
 
             if discord_id_result is None:
-                return await ctx.reply(
+                return await ctx.send(
                     f":exclamation:No character named `{name}` was found."
                 )
 
@@ -424,18 +424,18 @@ async def deduct(
 
                 # Commit the transaction
                 session.commit()
-                await ctx.reply(
+                await ctx.send(
                     f":white_check_mark:<@{discord_id}> spent `{amount}` DKP on `{titlecase(args)}` for `{name.capitalize()}`!"
                 )
             else:
-                await ctx.reply(
+                await ctx.send(
                     f":exclamation:`{amount}` is greater than `{name.capitalize()}`'s current total of `{current_dkp}` DKP. No action taken."
                 )
 
         except Exception as e:
             # Rollback the transaction in case of error
             session.rollback()
-            await ctx.reply(
+            await ctx.send(
                 f":question: <@816198379344232488> Something weird happened. `Error: {e}`"
             )
         finally:
@@ -477,12 +477,12 @@ async def award(
         )
 
         if discord_id_result is None:
-            return await ctx.reply(
+            return await ctx.send(
                 f":exclamation:No character named `{name}` was found."
             )
 
     except Exception as e:
-        return await ctx.reply(
+        return await ctx.send(
             f"An error occurred while getting the discord id: {str(e)}"
         )
 
@@ -515,13 +515,13 @@ async def award(
 
         # Commit the transaction
         session.commit()
-        await ctx.reply(
+        await ctx.send(
             f":white_check_mark:<@{discord_id}> earned `{amount}` DKP for `{titlecase(args)}` on `{name}`!"
         )
     except Exception as e:
         # Rollback the transaction in case of error
         session.rollback()
-        await ctx.reply(
+        await ctx.send(
             f":question: <@816198379344232488> Something weird happened. `Error: {e}`"
         )
     finally:
@@ -641,7 +641,7 @@ async def declare_toon(
 
     if level is not None:
         if level < 1 or level > 60:
-            await ctx.reply(
+            await ctx.send(
                 f":crossed_swords: Hail, `{toon.capitalize()}`! "
                 f"In the realms of Norrath, levels range from `1` to `60`. "
                 f"Adjust your compass and try again!"
@@ -655,23 +655,23 @@ async def declare_toon(
         try:
             discord_id = await get_discord_id(ctx, user_name, discord_id)
         except Exception as e:
-            await ctx.reply(f"An error occurred while getting the discord id: {str(e)}")
+            await ctx.send(f"An error occurred while getting the discord id: {str(e)}")
             return
     if not await check_allowed_channels(ctx):
-        await ctx.reply("This action must be performed on <#851549677815070751>.")
+        await ctx.send("This action must be performed on <#851549677815070751>.")
         return
 
     try:
         census = get_census()
     except Exception as e:
-        await ctx.reply(f"An error occurred while getting the census: {str(e)}")
+        await ctx.send(f"An error occurred while getting the census: {str(e)}")
         return
 
     if player_class is not None:
         try:
             player_class = await get_player_class(player_class)
         except Exception as e:
-            await ctx.reply(
+            await ctx.send(
                 f"An error occurred while getting the player class: {str(e)}"
             )
             return
@@ -679,13 +679,13 @@ async def declare_toon(
     try:
         toon_data = get_toon_data(toon)
     except Exception as e:
-        await ctx.reply(f"An error occurred while getting the toon data: {str(e)}")
+        await ctx.send(f"An error occurred while getting the toon data: {str(e)}")
         return
 
     try:
         discord_exists = check_discord_exists(discord_id)
     except Exception as e:
-        await ctx.reply(f"An error occurred while checking if discord exists: {str(e)}")
+        await ctx.send(f"An error occurred while checking if discord exists: {str(e)}")
         return
 
     if not discord_exists:
@@ -701,7 +701,7 @@ async def declare_toon(
             )
 
         except Exception as e:
-            await ctx.reply(f"An error occurred while adding user to dkp: {str(e)}")
+            await ctx.send(f"An error occurred while adding user to dkp: {str(e)}")
             return
 
     if player_class is not None and level is not None:
@@ -715,7 +715,7 @@ async def declare_toon(
                 )
 
         except Exception as e:
-            await ctx.reply(f"An error occurred while getting the toon data: {str(e)}")
+            await ctx.send(f"An error occurred while getting the toon data: {str(e)}")
             return
 
         try:
@@ -729,14 +729,14 @@ async def declare_toon(
                     f"Expected exactly one row with name {toon}, but found {len(toon_rows)} rows"
                 )
             owner = toon_rows.iloc[0]
-            await ctx.reply(
+            await ctx.send(
                 f":white_check_mark:<@{owner}>'s `{toon.capitalize()}` was entered into the census "
                 f"and is now a level `{level}` `{status}` `{player_class}`"
             )
             return
 
         except Exception as e:
-            await ctx.reply(
+            await ctx.send(
                 f"An error occurred while inserting `{toon.capitalize()}` to census. "
                 f"`{toon.capitalize()}` probably already exists. "
                 f"Try changing status. {str(e)}"
@@ -754,23 +754,23 @@ async def declare_toon(
                     f"Expected exactly one row with name {toon}, but found {len(toon_rows)} rows"
                 )
             owner = toon_rows.iloc[0]
-            await ctx.reply(
+            await ctx.send(
                 f":white_check_mark:<@{owner}>'s `{toon.capitalize()}` is now `{status}`"
             )
             return
 
         except Exception as e:
-            await ctx.reply(f"An error occurred while updating census: {str(e)}")
+            await ctx.send(f"An error occurred while updating census: {str(e)}")
             return
 
     if len(toon_data) == 0:
-        await ctx.reply(
+        await ctx.send(
             f":exclamation:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`"
         )
         return
 
     if len(toon_data) > 1:
-        await ctx.reply(
+        await ctx.send(
             f":exclamation:`{toon.capitalize()}` is ambiguous\nSee `!help main/alt/drop`"
         )
         return
@@ -801,16 +801,16 @@ async def promote(
         await member.remove_roles(probationary_role)
         await member.add_roles(member_role)
 
-        await ctx.reply(f"{name} has been promoted to full member.")
+        await ctx.send(f"{name} has been promoted to full member.")
         await channel.send(
             f"<@&870669705646587924> Send your congrats to <@{discord_id}>, the newest full member of Ex Astra!"
         )
     except AttributeError:
-        await ctx.reply(
+        await ctx.send(
             f"Sorry, a user with the name {name} could not be found. Please check the spelling and try again."
         )
     except Exception as e:
-        await ctx.reply(f"An error occurred while promoting {name}. Error message: {e}")
+        await ctx.send(f"An error occurred while promoting {name}. Error message: {e}")
 
 
 # @client.command(
@@ -819,7 +819,7 @@ async def promote(
 # )
 # @commands.has_role("Officer")
 # async def assign(ctx):
-#     await ctx.reply(
+#     await ctx.send(
 #         f"This command is now a slash command. "
 #         f"Please use `/assign` instead. "
 #         f"Pay careful attention to check if the toon already exists in the `toon` command build autocomplete. "
@@ -847,7 +847,7 @@ async def main(
     try:
         await declare_toon(ctx, "Main", toon, level, player_class, user_name)
     except ValueError as e:
-        await ctx.reply(f"Error: {e}")
+        await ctx.send(f"Error: {e}")
 
 
 @client.command(
@@ -870,7 +870,7 @@ async def bot(
     try:
         await declare_toon(ctx, "Bot", toon, level, player_class, user_name)
     except ValueError as e:
-        await ctx.reply(f"Error: {e}")
+        await ctx.send(f"Error: {e}")
 
 
 @client.command(
@@ -893,7 +893,7 @@ async def alt(
     try:
         await declare_toon(ctx, "Alt", toon, level, player_class, user_name)
     except ValueError as e:
-        await ctx.reply(f"Error: {e}")
+        await ctx.send(f"Error: {e}")
 
 
 @client.command(
@@ -919,7 +919,7 @@ async def drop(
 
     # determine if the character's toon has already been dropped
     if len(rows) > 0:
-        await ctx.reply(
+        await ctx.send(
             f":question:`{toon.capitalize()}` was not found\nSee `!help main/alt/drop`"
         )
 
@@ -939,7 +939,7 @@ async def purge(
     cur.execute("SELECT discord_id FROM census WHERE name = %s;", (toon.capitalize(),))
     rows = cur.fetchall()
     if len(rows) == 0:
-        await ctx.reply(
+        await ctx.send(
             f":warning: No character named `{toon.capitalize()}` found in the census."
         )
         return
@@ -951,7 +951,7 @@ async def purge(
     for row in all_toons:
         toon_name = row[0]
         await drop(ctx, toon_name)
-    await ctx.reply(
+    await ctx.send(
         f":white_check_mark: All toons associated with `{toon.capitalize()}` have been purged."
     )
 
@@ -1008,7 +1008,7 @@ async def ding(
         total_users = session.query(Dkp).count()
 
         if toon_data is None:
-            await ctx.reply(
+            await ctx.send(
                 f":x: <@{toon_owner}>'s `{toon.capitalize()}` was not found."
             )
             return
@@ -1059,13 +1059,13 @@ async def ding(
 
         # Check that the new level is valid
         if new_level == current_level:
-            await ctx.reply(
+            await ctx.send(
                 f":level_slider: `{toon.capitalize()}` is already at level `{new_level}`"
             )
             return
 
         if new_level < 1 or new_level > 60:
-            await ctx.reply(
+            await ctx.send(
                 f":compass: Hail, `{toon.capitalize()}`! In the realms of Norrath, levels range from `1` to `60`."
                 f"Adjust your compass and try again!",
             )
@@ -1085,7 +1085,7 @@ async def ding(
         symbol = (
             ":arrow_double_up:" if new_level > current_level else ":arrow_double_down:"
         )
-        await ctx.reply(
+        await ctx.send(
             f"{symbol}<@{toon_owner}>'s `{toon.capitalize()}` is now level `{new_level}`"
         )
 
@@ -1121,13 +1121,13 @@ async def ding(
 #         toon_owner = toon_data.discord_id
 
 #         if toon_data is None:
-#             await ctx.reply(f":x: `{toon.capitalize()}` was not found.")
+#             await ctx.send(f":x: `{toon.capitalize()}` was not found.")
 #             return
 
 #         current_level = toon_data.level
 
 #         if current_level == 1:
-#             await ctx.reply(
+#             await ctx.send(
 #                 f":level_slider: <@{toon_owner}>'s `{toon.capitalize()}` is already at the lowest level `{current_level}`!"
 #             )
 #             return
@@ -1138,7 +1138,7 @@ async def ding(
 #         await ctx.invoke(client.get_command("ding"), toon=toon, new_level=new_level)
 
 #     except Exception as e:
-#         await ctx.reply(content=f":x: An error occurred: {str(e)}")
+#         await ctx.send(content=f":x: An error occurred: {str(e)}")
 #     finally:
 #         session.close()
 
@@ -1169,19 +1169,19 @@ def create_toons_embed(owner, toons):
 
             embed.add_field(
                 name=":bust_in_silhouette: Name",
-                value="```\n" + "\n".join(toons.name.tolist()) + "\n```",
+                value="\n" + "\n".join(toons.name.tolist()) + "\n",
                 inline=True,
             )
 
             embed.add_field(
                 name=":crossed_swords:️ Class",
-                value="```\n" + "\n".join(toons.character_class.tolist()) + "\n```",
+                value="\n" + "\n".join(toons.character_class.tolist()) + "\n",
                 inline=True,
             )
 
             embed.add_field(
                 name=":arrow_double_up: Level",
-                value="```\n" + "\n".join(map(str, toons.level.tolist())) + "\n```",
+                value="\n" + "\n".join(map(str, toons.level.tolist())) + "\n",
                 inline=True,
             )
 
@@ -1226,7 +1226,7 @@ async def toons(
                 )
                 toon_owner = toon_data.discord_id
             except Exception as e:
-                await ctx.reply(f":x: No toon named `{toon.capitalize()}` was found.")
+                await ctx.send(f":x: No toon named `{toon.capitalize()}` was found.")
                 return
 
         query = session.query(Census).filter_by(discord_id=str(toon_owner))
@@ -1241,10 +1241,10 @@ async def toons(
         discord_id = unique_discord_ids[0]
 
         toons_list = create_toons_embed(ctx.guild.get_member(int(toon_owner)), toons)
-        await ctx.reply(embed=toons_list)
+        await ctx.send(embed=toons_list)
 
     except Exception as e:
-        await ctx.reply(content=f":x: An error occurred: {str(e)}")
+        await ctx.send(content=f":x: An error occurred: {str(e)}")
 
     finally:
         session.close()
@@ -1333,13 +1333,13 @@ async def dkp(
     if not dkp_dict.empty:
         user = ctx.guild.get_member(int(discord_id)) if discord_id is not None else None
         dkp_embed = create_dkp_embed(discord_id, dkp_dict, high_level_names)
-        await ctx.reply(embed=dkp_embed)
+        await ctx.send(embed=dkp_embed)
     else:
-        await ctx.reply(content=":question: No census entry was found. Check `!toons`.")
+        await ctx.send(content=":question: No census entry was found. Check `!toons`.")
 
 
 @client.command(
-    help="Updates DKP based on raid logs. Usage: !logs <description> with logs or as a reply to logs.",
+    help="Updates DKP based on raid logs. Usage: !logs <description> with logs or as a send to logs.",
     brief="Updates DKP from raid logs",
 )
 @commands.has_role("Officer")
@@ -1347,7 +1347,7 @@ async def logs(
     ctx,
     *,
     args: str = commands.parameter(
-        description="The raid logs to process. Can be a reply to posted logs."
+        description="The raid logs to process. Can be a send to posted logs."
     ),
 ):
 
@@ -1375,16 +1375,16 @@ async def logs(
         modifier = modifier.item()
 
     else:
-        await ctx.reply(f"`{raid}` entry not found.\nAsk Rahmani")
+        await ctx.send(f"`{raid}` entry not found.\nAsk Rahmani")
         return
 
     # create empty lists of rejected players and seen players to prevent double counting
     seen_players = []
     rejected = []
 
-    # if this is a reply to a message
-    is_reply = check_reply(ctx)
-    if is_reply == True:
+    # if this is a send to a message
+    is_send = check_send(ctx)
+    if is_send == True:
         message = await ctx.channel.fetch_message(ctx.message.reference.message_id)
         args = message.content
 
@@ -1463,31 +1463,31 @@ async def logs(
             con.commit()
 
         else:
-            await ctx.reply(f"Something is wrong with the record: {record}")
+            await ctx.send(f"Something is wrong with the record: {record}")
             con.rollback()
 
         sql_response = (
             "UPDATE dkp SET earned_dkp = earned_dkp + %s WHERE discord_id = %s;"
         )
         cur.execute(sql_response, (modifier, discord_id))
-        # await ctx.reply(sql_response)
+        # await ctx.send(sql_response)
 
         if cur.rowcount == 1:
             con.commit()
 
         else:
-            await ctx.reply(
+            await ctx.send(
                 f":exclamation:Something is wrong with the record: `{record}`"
             )
             con.rollback()
 
     if len(seen_players) > 0:
-        await ctx.reply(
+        await ctx.send(
             f":dragon:{', '.join(seen_players)} earned `{modifier}` DKP for `{raid}` this hour."
         )
         await ctx.message.add_reaction("✅")
 
-        if is_reply:
+        if is_send:
             await message.add_reaction("✅")
 
     if len(rejected) > 0:
@@ -1497,12 +1497,12 @@ async def logs(
         rejected = re.sub("```", "", rejected)
         # get rid of the extra triple backticks
 
-        await ctx.reply(
+        await ctx.send(
             f":question:Some logs got rejected, since these players are not registered. ```\n{rejected}\n```"
         )
         await ctx.message.add_reaction("❌")
 
-        if is_reply:
+        if is_send:
             await message.add_reaction("❌")
 
 
@@ -1563,7 +1563,7 @@ async def sanctum(
                 break
         else:
             # If no table was found, send a message and return
-            await ctx.reply(
+            await ctx.send(
                 "Unfortunately, no table with the required columns was found. Please alert an officer."
             )
             return
@@ -1621,7 +1621,7 @@ async def sanctum(
                 inline=True,
             )
 
-        await ctx.reply(embed=rap_list, view=view)
+        await ctx.send(embed=rap_list, view=view)
 
 
 @client.command(
@@ -1635,7 +1635,7 @@ async def inventory(ctx):
 
         # check if the message has attachments
         if len(ctx.message.attachments) < 1:
-            await ctx.reply(
+            await ctx.send(
                 ":x: Please attach at least one inventory file to your message. Inventory update failed."
             )
             return
@@ -1777,7 +1777,7 @@ async def wheresmy(ctx, *, stuff):
             trash_items = [name[0] for name in trash_items]  # Extract names from tuples
 
         except Exception as e:
-            await ctx.reply(f":x: An error occurred. {e}")
+            await ctx.send(f":x: An error occurred. {e}")
             return
 
         # retrieve list of items from Inventory where toon matches the user
@@ -1795,12 +1795,12 @@ async def wheresmy(ctx, *, stuff):
             items = items.sort_values("name")
 
         except Exception as e:
-            await ctx.reply(f":x: An error occurred. {e}")
+            await ctx.send(f":x: An error occurred. {e}")
             return
 
         # check if the search term is in the items
         if items.empty:
-            await ctx.reply(
+            await ctx.send(
                 f":x: `{titlecase(stuff)}` was not found in inventory for <@{ctx.author.id}>",
                 view=view,
             )
@@ -1812,7 +1812,7 @@ async def wheresmy(ctx, *, stuff):
 
         file, path = table_to_file(items)
 
-        view.response_message = await ctx.reply(
+        view.response_message = await ctx.send(
             f":mag: Found `{len(items)}` item(s) matching `{titlecase(stuff)}` in inventory for <@{ctx.author.id}>.",
             file=file,
             view=view,
@@ -1853,7 +1853,7 @@ async def find(ctx, *, stuff):
             trash_items = [name[0] for name in trash_items]  # Extract names from tuples
 
         except Exception as e:
-            await ctx.reply(f":x: An error occurred. {e}")
+            await ctx.send(f":x: An error occurred. {e}")
             return
 
         # retrieve list of items from Inventory where toon matches the user
@@ -1917,12 +1917,12 @@ async def find(ctx, *, stuff):
             # replace the original items DataFrame with the new one
             items = new_items
         except Exception as e:
-            await ctx.reply(f":x: An error occurred. {e}")
+            await ctx.send(f":x: An error occurred. {e}")
             return
 
         # check if the search term is in the items
         if items.empty:
-            view.response_message = await ctx.reply(
+            view.response_message = await ctx.send(
                 f"No matches found for `{titlecase(stuff)}`.",
                 view=view,
             )
@@ -1933,10 +1933,10 @@ async def find(ctx, *, stuff):
         try:
             file, path = table_to_file(items)
         except Exception as e:
-            await ctx.reply(f":x: An error occurred. {e}")
+            await ctx.send(f":x: An error occurred. {e}")
             return
 
-        view.response_message = await ctx.reply(
+        view.response_message = await ctx.send(
             f":mag: Results for `{titlecase(stuff)}` in bankers inventory.",
             file=file,
             view=view,
@@ -1958,7 +1958,7 @@ async def bank(ctx):
     if ctx.message.attachments:
         attachment = ctx.message.attachments[0]
     else:
-        await ctx.reply(
+        await ctx.send(
             "No attachment found in the message. "
             "Try attaching a banker's inventory with `!bank`."
         )
@@ -1971,7 +1971,7 @@ async def bank(ctx):
     banker_name = Path(attachment.url).stem.split("-")[0]
     inventory_keyword = Path(attachment.url).stem.split("-")[1]
 
-    await ctx.reply(f"Parsing `{inventory_keyword}` for `{banker_name}`")
+    await ctx.send(f"Parsing `{inventory_keyword}` for `{banker_name}`")
 
     old_data = pd.read_sql(
         "SELECT name, quantity FROM bank WHERE Banker = %s",
@@ -2081,6 +2081,8 @@ async def bank(ctx):
         for diff_string in diff_strings:
             await treasury_channel.send(f"```{diff_string}```")
 
+    await ctx.message.delete()  # Delete the original message
+
 
 @client.command(
     help="Complete data dump of every inventory item on the guild bankers",
@@ -2135,10 +2137,10 @@ async def banktotals(ctx, stuff=None):
     try:
         file, path = table_to_file(banktotals)
     except Exception as e:
-        await ctx.reply(f":x: An error occurred. {e}")
+        await ctx.send(f":x: An error occurred. {e}")
         return
 
-    view.response_message = await ctx.reply(
+    view.response_message = await ctx.send(
         f":moneybag:Here's the bank totals.\nRequested by <@{ctx.author.id}>.",
         file=file,
         view=view,
@@ -2176,7 +2178,7 @@ async def banker(ctx, banker_name=None):
 
         bankers = bank["banker"].unique()
         bankers = sorted(bankers)
-        await ctx.reply(
+        await ctx.send(
             f":x: Please specify a banker. Available bankers are: {list_to_oxford_comma(bankers)}"
         )
 
@@ -2188,10 +2190,10 @@ async def banker(ctx, banker_name=None):
         try:
             file, path = table_to_file(bank)
         except Exception as e:
-            await ctx.reply(f":x: An error occurred. {e}")
+            await ctx.send(f":x: An error occurred. {e}")
             return
 
-        view.response_message = await ctx.reply(
+        view.response_message = await ctx.send(
             f":moneybag:Here's the bank totals for `{banker_name}`.\nRequested by <@{ctx.author.id}>.",
             file=file,
             view=view,
@@ -2200,91 +2202,91 @@ async def banker(ctx, banker_name=None):
         os.remove(path)
 
 
-# @client.command()
-# async def bidhistory(ctx):
+@client.command()
+async def bidhistory(ctx):
 
-#     view = discord.ui.View(timeout=None)
-#     view.add_item(
-#         DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
-#     )
-#     view.add_item(DMButton(ctx.author.id))
+    view = discord.ui.View(timeout=None)
+    view.add_item(
+        DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
+    )
+    view.add_item(DMButton(ctx.author.id))
 
-#     engine = sqlalchemy.create_engine(POSTGRES_URL, echo=False)
-#     # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
-#     discord_id = str(ctx.author.id)
-#     items = pd.read_sql_table("items", con=engine)
-#     items = items.loc[items["discord_id"] == discord_id]
-#     items = items[["name", "date", "item", "dkp_spent"]]
+    engine = sqlalchemy.create_engine(POSTGRES_URL, echo=False)
+    # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    discord_id = str(ctx.author.id)
+    items = pd.read_sql_table("items", con=engine)
+    items = items.loc[items["discord_id"] == discord_id]
+    items = items[["name", "date", "item", "dkp_spent"]]
 
-#     # wherever dkp_spent is nan, conver to 0
-#     items["dkp_spent"] = items["dkp_spent"].fillna(0)
+    # wherever dkp_spent is nan, conver to 0
+    items["dkp_spent"] = items["dkp_spent"].fillna(0)
 
-#     items["dkp_spent"] = items["dkp_spent"].astype(int)
-#     # items = items.groupby(['name'])['quantity'].sum().reset_index()[['quantity', 'name']]
+    items["dkp_spent"] = items["dkp_spent"].astype(int)
+    # items = items.groupby(['name'])['quantity'].sum().reset_index()[['quantity', 'name']]
 
-#     try:
-#         file, path = table_to_file(items)
-#     except Exception as e:
-#         await ctx.reply(f":x: An error occurred. {e}")
-#         return
+    try:
+        file, path = table_to_file(items)
+    except Exception as e:
+        await ctx.send(f":x: An error occurred. {e}")
+        return
 
-#     view.response_message = await ctx.reply(
-#         f":moneybag: Here's your bid history.\nRequested by <@{ctx.author.id}>.",
-#         file=file,
-#         view=view,
-#     )
+    view.response_message = await ctx.send(
+        f":moneybag: Here's your bid history.\nRequested by <@{ctx.author.id}>.",
+        file=file,
+        view=view,
+    )
 
-#     os.remove(path)
-
-
-# @client.command()
-# async def dkphistory(ctx):
-
-#     view = discord.ui.View(timeout=None)
-#     view.add_item(
-#         DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
-#     )
-#     view.add_item(DMButton(ctx.author.id))
-
-#     engine = sqlalchemy.create_engine(POSTGRES_URL, echo=False)
-#     # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
-#     discord_id = str(ctx.author.id)
-#     attendance = pd.read_sql_table("attendance", con=engine)
-#     attendance = attendance.loc[attendance["discord_id"] == discord_id]
-#     attendance = attendance[["name", "date", "raid", "modifier"]]
-#     # wherever dkp_spent is nan, conver to 0
-#     attendance["modifier"] = attendance["modifier"].fillna(0)
-
-#     attendance["modifier"] = attendance["modifier"].astype(int)
-#     # items = items.groupby(['name'])['quantity'].sum().reset_index()[['quantity', 'name']]
-
-#     try:
-#         file, path = table_to_file(attendance)
-#     except Exception as e:
-#         await ctx.reply(f":x: An error occurred. {e}")
-#         return
-
-#     view.response_message = await ctx.reply(
-#         f":moneybag: Here's your DKP earnings history.",
-#         file=file,
-#         view=view,
-#     )
-
-#     os.remove(path)
+    os.remove(path)
 
 
-# @client.command()
-# async def who(ctx, level, optional_max_level=None, player_class=None):
-#     level, max_level, player_class = await validate_and_process_input(
-#         ctx, level, optional_max_level, player_class
-#     )
-#     if level is None:
-#         return
-#     matching_toons = fetch_matching_toons(level, max_level, player_class)
-#     if len(matching_toons) == 0:
-#         await reply_no_matching_toon(ctx, level, max_level, player_class)
-#     else:
-#         await reply_matching_toons(ctx, matching_toons, level, max_level, player_class)
+@client.command()
+async def dkphistory(ctx):
+
+    view = discord.ui.View(timeout=None)
+    view.add_item(
+        DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
+    )
+    view.add_item(DMButton(ctx.author.id))
+
+    engine = sqlalchemy.create_engine(POSTGRES_URL, echo=False)
+    # discord_id = str(ctx.message.guild.get_member_named(format(ctx.author)).id)
+    discord_id = str(ctx.author.id)
+    attendance = pd.read_sql_table("attendance", con=engine)
+    attendance = attendance.loc[attendance["discord_id"] == discord_id]
+    attendance = attendance[["name", "date", "raid", "modifier"]]
+    # wherever dkp_spent is nan, conver to 0
+    attendance["modifier"] = attendance["modifier"].fillna(0)
+
+    attendance["modifier"] = attendance["modifier"].astype(int)
+    # items = items.groupby(['name'])['quantity'].sum().reset_index()[['quantity', 'name']]
+
+    try:
+        file, path = table_to_file(attendance)
+    except Exception as e:
+        await ctx.send(f":x: An error occurred. {e}")
+        return
+
+    view.response_message = await ctx.send(
+        f":moneybag: Here's your DKP earnings history.",
+        file=file,
+        view=view,
+    )
+
+    os.remove(path)
+
+
+@client.command()
+async def who(ctx, level, optional_max_level=None, player_class=None):
+    level, max_level, player_class = await validate_and_process_input(
+        ctx, level, optional_max_level, player_class
+    )
+    if level is None:
+        return
+    matching_toons = fetch_matching_toons(level, max_level, player_class)
+    if len(matching_toons) == 0:
+        await send_no_matching_toon(ctx, level, max_level, player_class)
+    else:
+        await send_matching_toons(ctx, matching_toons, level, max_level, player_class)
 
 
 async def send_split_message(ctx, message):
@@ -2298,7 +2300,7 @@ async def validate_and_process_input(ctx, level, optional_max_level, player_clas
     try:
         level = int(level)
     except ValueError:
-        ctx.reply(f"{level} is not a valid level.")
+        ctx.send(f"{level} is not a valid level.")
         return None, None, None
 
     if player_class is None:  # Exact mode
@@ -2308,15 +2310,15 @@ async def validate_and_process_input(ctx, level, optional_max_level, player_clas
         try:
             max_level = int(optional_max_level)
         except ValueError:
-            ctx.reply(f"{optional_max_level} is not a valid level.")
+            ctx.send(f"{optional_max_level} is not a valid level.")
             return None, None, None
 
         if level > max_level:
-            ctx.reply("Invalid level range.")
+            ctx.send("Invalid level range.")
             return None, None, None
 
     if not 1 <= level <= 60:
-        ctx.reply("You think you're funny, huh?")
+        ctx.send("You think you're funny, huh?")
         return None, None, None
 
     return (
@@ -2353,16 +2355,16 @@ async def validate_and_process_input(ctx, level, optional_max_level, player_clas
 #     ]
 
 
-# async def reply_no_matching_toon(ctx, level, max_level, player_class):
+# async def send_no_matching_toon(ctx, level, max_level, player_class):
 #     if max_level == level:
-#         await ctx.reply(f"There were no level {level} {player_class}s found.")
+#         await ctx.send(f"There were no level {level} {player_class}s found.")
 #     else:
-#         await ctx.reply(
+#         await ctx.send(
 #             f"There were no level {level} to {max_level} {player_class}s found."
 #         )
 
 
-# async def reply_matching_toons(ctx, matching_toons, level, max_level, player_class):
+# async def send_matching_toons(ctx, matching_toons, level, max_level, player_class):
 #     guild = ctx.guild
 #     names = []
 #     mentions = []
@@ -2412,7 +2414,7 @@ async def validate_and_process_input(ctx, level, optional_max_level, player_clas
 #             text=f"The following characters appear not to belong to this server anymore:\n{left_server_names_str}"
 #         )
 
-#     await ctx.reply(embed=embed)
+#     await ctx.send(embed=embed)
 
 
 @client.command(
@@ -2443,13 +2445,13 @@ async def claim(ctx, toon):
 
         session.commit()
 
-        await ctx.reply(
+        await ctx.send(
             f":white_check_mark:<@{discord_id}> has taken control of `{toon}` from <@{old_owner}>."
         )
 
     if claimed_toon.status != "Bot" and claimed_toon.status != "Dropped":
 
-        await ctx.reply(
+        await ctx.send(
             f":exclamation:`{toon}` can only change ownership if <@{old_owner}> changes status using `!bot` or `!drop`.",
             f"Try `!drop {toon}` or `!bot {toon}`.",
         )
@@ -2468,24 +2470,24 @@ async def on_command_error(ctx, error):
     print(f"Error message: {ctx.message.content}")
 
     if isinstance(error, CommandNotFound):
-        await ctx.reply(f":question: Command not found \nSee `!help`")
+        await ctx.send(f":question: Command not found \nSee `!help`")
         return
 
     if isinstance(error, commands.NoPrivateMessage):
-        await ctx.reply(f":question: This command must be used in a public channel")
+        await ctx.send(f":question: This command must be used in a public channel")
         return
 
     if isinstance(error, commands.MissingRequiredArgument) or isinstance(
         error, commands.BadArgument
     ):
         command = ctx.message.content.split()[0]
-        await ctx.reply(
+        await ctx.send(
             f":question: Missing some information. \nSee `!help {command[1:]}`"
         )
         return
 
     if isinstance(error, commands.MissingRole):
-        await ctx.reply(
+        await ctx.send(
             f":question: Command reserved for a different role \nSee `!help`"
         )
         return
@@ -2537,7 +2539,7 @@ async def ask(ctx, *, question):
         chunks = chunk_strings(response)
 
         for chunk in chunks:
-            await ctx.reply(chunk)
+            await ctx.send(chunk)
 
 
 async def async_openai_call(messages):
@@ -2548,7 +2550,7 @@ async def async_openai_call(messages):
         }
         data = json.dumps(
             {
-                "model": "gpt-3.5-turbo",  # Specify the model here
+                "model": "gpt-4-turbo-preview",  # Specify the model here
                 "messages": messages,  # List of messages
                 # No need for max_tokens or temperature here
             }
