@@ -14,7 +14,8 @@ from pathlib import Path
 from urllib.request import Request, urlopen
 
 import psycopg2
-from embed_assisted_questions import ask_async
+
+# from embed_assisted_questions import ask_async
 import config
 
 import aiohttp
@@ -637,6 +638,10 @@ async def declare_toon(
     user_name: str = None,
     discord_id: str = None,
 ):
+    # await ctx.reply(
+    #     "Unfortunately, character declaration commands preceded with a `!` are no longer supported by Discord.\nPlease see `/help` for usage on `/main`, and `/alt`, and `/bot`.\nFor changing status between `main`, `alt`, and `bot`, see  `/change`."
+    # )
+    # return
     current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     if level is not None:
@@ -928,35 +933,6 @@ async def drop(
 
 
 @client.command(
-    help="Removes all characters associated with a specified character's name. Usage: !purge <character>",
-    brief="Removes all characters linked to a name",
-)
-@commands.has_role("Officer")
-async def purge(
-    ctx,
-    toon: str = commands.parameter(description="The name of the character to purge."),
-):
-    cur.execute("SELECT discord_id FROM census WHERE name = %s;", (toon.capitalize(),))
-    rows = cur.fetchall()
-    if len(rows) == 0:
-        await ctx.send(
-            f":warning: No character named `{toon.capitalize()}` found in the census."
-        )
-        return
-    discord_id = rows[0][0]
-    cur.execute(
-        "SELECT DISTINCT name FROM census WHERE discord_id = %s;", (discord_id,)
-    )
-    all_toons = cur.fetchall()
-    for row in all_toons:
-        toon_name = row[0]
-        await drop(ctx, toon_name)
-    await ctx.send(
-        f":white_check_mark: All toons associated with `{toon.capitalize()}` have been purged."
-    )
-
-
-@client.command(
     aliases=["level"],
     help="Updates the level of a character. If new level is not provided, the character's current level is incremented by 1.",
     brief="Updates the level of a character",
@@ -1091,56 +1067,6 @@ async def ding(
 
     finally:
         pass
-
-
-# @client.command(
-#     help="Decreases the level of a character by 1. Usage: !dong <toon>",
-#     brief="Decreases the level of a character",
-# )
-# async def dong(
-#     ctx,
-#     toon: str = commands.parameter(
-#         description="The name of the character whose level is to be decreased."
-#     ),
-# ):
-#     try:
-#         engine = create_engine(POSTGRES_URL, echo=False)
-#         Session = sessionmaker(bind=engine)
-#         session = Session()
-
-#         # Reflect the tables
-#         Base = automap_base()
-#         Base.prepare(autoload_with=engine)
-
-#         # Mapped classes are now created with names by default
-#         # matching that of the table name.
-#         Census = Base.classes.census
-
-#         toon_data = session.query(Census).filter_by(
-#             name=toon.capitalize()).first()
-#         toon_owner = toon_data.discord_id
-
-#         if toon_data is None:
-#             await ctx.send(f":x: `{toon.capitalize()}` was not found.")
-#             return
-
-#         current_level = toon_data.level
-
-#         if current_level == 1:
-#             await ctx.send(
-#                 f":level_slider: <@{toon_owner}>'s `{toon.capitalize()}` is already at the lowest level `{current_level}`!"
-#             )
-#             return
-
-#         new_level = current_level - 1
-
-#         # Invoke the ding command with the new level
-#         await ctx.invoke(client.get_command("ding"), toon=toon, new_level=new_level)
-
-#     except Exception as e:
-#         await ctx.send(content=f":x: An error occurred: {str(e)}")
-#     finally:
-#         session.close()
 
 
 def create_toons_embed(owner, toons):
@@ -1366,17 +1292,20 @@ async def logs(
 
     raid = titlecase(args.splitlines()[0])
 
-    # retrieve entire tables from SQLite
-    # query how much this raid is worth
-    modifier = raids.loc[raids["raid"] == raid, "modifier"]
-
-    # is there a raid modifier and is it unique?
-    if len(modifier.index) == 1:
-        modifier = modifier.item()
-
-    else:
-        await ctx.send(f"`{raid}` entry not found.\nAsk Rahmani")
-        return
+    # Check if raid can be cast to an integer
+    try:
+        raid_int = int(raid)
+        # If raid is an integer, handle accordingly
+        # For example, directly use raid_int as a modifier or look it up differently
+        modifier = raid_int  # Or any other logic specific to integer handling
+    except ValueError:
+        # If raid is not an integer, proceed with string logic
+        modifier = raids.loc[raids["raid"] == raid, "modifier"]
+        if len(modifier.index) == 1:
+            modifier = modifier.item()
+        else:
+            await ctx.send(f"`{raid}` entry not found.\nAsk Rahmani")
+            return
 
     # create empty lists of rejected players and seen players to prevent double counting
     seen_players = []
@@ -1595,18 +1524,10 @@ async def sanctum(
         rap_totals = inner_merged.loc[inner_merged["discord_id"] == discord_id]
 
         rap_list = discord.Embed(
-            # if username is the author, mention the author
-            # if username is not the author, mention the username
-            # title=f":shield: Sanctum DKP for "
             title=f":shield: Sanctum DKP as of {RAP_age}",
             description=f"<@{format(discord_id)}> has `{len(rap_totals)}` linked main{'s' if len(rap_totals) != 1 else ''} with DKP in [Sanctum](https://p99sanctum.com).",
             colour=discord.Colour.from_rgb(241, 196, 15),
         )
-
-        # rap_list.add_field(
-        #     name=f"Main Character{'s' if len(rap_totals) != 1 else ''}",
-        #     value=f"`{len(rap_totals)}` linked main character{'s' if len(rap_totals) != 1 else ''} with DKP in [Sanctum](https://p99sanctum.com).",
-        #     inline=False)
 
         if len(rap_totals) > 0:
             rap_list.add_field(
@@ -1739,89 +1660,6 @@ async def inventory(ctx):
             # send all messages at once
             await ctx.send("\n".join(response_messages))
             session.close()
-
-
-@client.command(
-    help="Keep track of shared bot's inventory. Usage 'wheresmy [item]'",
-    brief="Find an item on a shared bot",
-)
-@commands.has_role("Member")
-async def wheresmy(ctx, *, stuff):
-
-    view = discord.ui.View(timeout=None)
-    view.add_item(
-        DeleteButton(user_id=ctx.author.id, original_message_id=ctx.message.id)
-    )
-    view.add_item(DMButton(ctx.author.id))
-
-    async with ctx.typing():
-
-        engine = create_engine(POSTGRES_URL)
-        Base = automap_base()
-        Base.prepare(autoload_with=engine)
-        Census = Base.classes.census
-        Inventory = Base.classes.inventory
-        Trash = Base.classes.trash
-
-        session = Session(engine)
-
-        # retrieve list of names from Census where discord_id matches the user
-        try:
-            toon_names = (
-                session.query(Census.name)
-                .filter_by(discord_id=str(ctx.author.id))
-                .all()
-            )
-            toon_names = [name[0] for name in toon_names]  # Extract names from tuples
-            trash_items = session.query(Trash.name).all()
-            trash_items = [name[0] for name in trash_items]  # Extract names from tuples
-
-        except Exception as e:
-            await ctx.send(f":x: An error occurred. {e}")
-            return
-
-        # retrieve list of items from Inventory where toon matches the user
-        try:
-            query = session.query(
-                Inventory.name, Inventory.toon, Inventory.location, Inventory.quantity
-            ).filter(
-                sqlalchemy.and_(
-                    Inventory.toon.in_(toon_names),
-                    ~Inventory.name.in_(trash_items),
-                    Inventory.name.ilike(f"%{stuff}%"),
-                )
-            )
-            items = pd.read_sql(query.statement, query.session.bind)
-            items = items.sort_values("name")
-
-        except Exception as e:
-            await ctx.send(f":x: An error occurred. {e}")
-            return
-
-        # check if the search term is in the items
-        if items.empty:
-            await ctx.send(
-                f":x: `{titlecase(stuff)}` was not found in inventory for <@{ctx.author.id}>",
-                view=view,
-            )
-
-            session.close()
-            return
-
-        # Send the embed with the image
-
-        file, path = table_to_file(items)
-
-        view.response_message = await ctx.send(
-            f":mag: Found `{len(items)}` item(s) matching `{titlecase(stuff)}` in inventory for <@{ctx.author.id}>.",
-            file=file,
-            view=view,
-        )
-
-        # Close the session
-        session.close()
-
-        os.remove(path)
 
 
 @client.command(
@@ -2106,6 +1944,13 @@ async def banktotals(ctx, stuff=None):
         banktotals = (
             bank.groupby(["name"])["quantity"].sum().reset_index()[["quantity", "name"]]
         )
+        # Add bankers column
+        bankers = (
+            bank.groupby("name")["banker"]
+            .apply(lambda x: ", ".join(x.unique()))
+            .reset_index()
+        )
+        banktotals = banktotals.merge(bankers, on="name")
 
     # this query should be case insensitive
     elif stuff is not None:
@@ -2127,13 +1972,19 @@ async def banktotals(ctx, stuff=None):
                 .sum()
                 .reset_index()[["quantity", "name"]]
             )
+            # Add bankers column
+            bankers = (
+                bank.groupby("name")["banker"]
+                .apply(lambda x: ", ".join(x.unique()))
+                .reset_index()
+            )
+            banktotals = banktotals.merge(bankers, on="name")
+
             # arrange by quantity descending, then name ascending
             banktotals = banktotals.sort_values(
                 ["quantity", "name"], ascending=[False, True]
             )
 
-            # check if the user's search is the keyword "empty", case insensitive
-            # return a list of how many times the name == "empty" for each banker on the bank table, ignoring quantity
     try:
         file, path = table_to_file(banktotals)
     except Exception as e:
@@ -2275,57 +2126,57 @@ async def dkphistory(ctx):
     os.remove(path)
 
 
-@client.command()
-async def who(ctx, level, optional_max_level=None, player_class=None):
-    level, max_level, player_class = await validate_and_process_input(
-        ctx, level, optional_max_level, player_class
-    )
-    if level is None:
-        return
-    matching_toons = fetch_matching_toons(level, max_level, player_class)
-    if len(matching_toons) == 0:
-        await send_no_matching_toon(ctx, level, max_level, player_class)
-    else:
-        await send_matching_toons(ctx, matching_toons, level, max_level, player_class)
+# @client.command()
+# async def who(ctx, level, optional_max_level=None, player_class=None):
+#     level, max_level, player_class = await validate_and_process_input(
+#         ctx, level, optional_max_level, player_class
+#     )
+#     if level is None:
+#         return
+#     matching_toons = fetch_matching_toons(level, max_level, player_class)
+#     if len(matching_toons) == 0:
+#         await send_no_matching_toon(ctx, level, max_level, player_class)
+#     else:
+#         await send_matching_toons(ctx, matching_toons, level, max_level, player_class)
 
 
-async def send_split_message(ctx, message):
-    max_length = 2000
-    messages = [message[i : i + max_length] for i in range(0, len(message), max_length)]
-    for msg in messages:
-        await ctx.send(msg)
+# async def send_split_message(ctx, message):
+#     max_length = 2000
+#     messages = [message[i : i + max_length] for i in range(0, len(message), max_length)]
+#     for msg in messages:
+#         await ctx.send(msg)
 
 
-async def validate_and_process_input(ctx, level, optional_max_level, player_class):
-    try:
-        level = int(level)
-    except ValueError:
-        ctx.send(f"{level} is not a valid level.")
-        return None, None, None
+# async def validate_and_process_input(ctx, level, optional_max_level, player_class):
+#     try:
+#         level = int(level)
+#     except ValueError:
+#         ctx.send(f"{level} is not a valid level.")
+#         return None, None, None
 
-    if player_class is None:  # Exact mode
-        max_level = level
-        player_class = optional_max_level
-    else:  # Range mode
-        try:
-            max_level = int(optional_max_level)
-        except ValueError:
-            ctx.send(f"{optional_max_level} is not a valid level.")
-            return None, None, None
+#     if player_class is None:  # Exact mode
+#         max_level = level
+#         player_class = optional_max_level
+#     else:  # Range mode
+#         try:
+#             max_level = int(optional_max_level)
+#         except ValueError:
+#             ctx.send(f"{optional_max_level} is not a valid level.")
+#             return None, None, None
 
-        if level > max_level:
-            ctx.send("Invalid level range.")
-            return None, None, None
+#         if level > max_level:
+#             ctx.send("Invalid level range.")
+#             return None, None, None
 
-    if not 1 <= level <= 60:
-        ctx.send("You think you're funny, huh?")
-        return None, None, None
+#     if not 1 <= level <= 60:
+#         ctx.send("You think you're funny, huh?")
+#         return None, None, None
 
-    return (
-        level,
-        max_level,
-        await get_player_class(player_class) if player_class is not None else None,
-    )
+#     return (
+#         level,
+#         max_level,
+#         await get_player_class(player_class) if player_class is not None else None,
+#     )
 
 
 # def fetch_matching_toons(level, max_level, player_class):
@@ -2498,48 +2349,48 @@ async def on_command_error(ctx, error):
 ###########
 
 
-@client.command(
-    help="Asks a question and provides a response. Usage: !ask <question> [--required_keyword=<value1,value2,...>]",
-    brief="Ask a question and get an answer.",
-)
-async def ask(ctx, *, question):
-    """
-    This command allows users to ask a question and get an answer.
-    The question can include an optional 'required_keyword' argument
-    to pass specific keywords to the downstream function.
+# @client.command(
+#     help="Asks a question and provides a response. Usage: !ask <question> [--required_keyword=<value1,value2,...>]",
+#     brief="Ask a question and get an answer.",
+# )
+# async def ask(ctx, *, question):
+#     """
+#     This command allows users to ask a question and get an answer.
+#     The question can include an optional 'required_keyword' argument
+#     to pass specific keywords to the downstream function.
 
-    Usage:
-    !ask What is the weather today? --required_keyword=sunny,rainy
+#     Usage:
+#     !ask What is the weather today? --required_keyword=sunny,rainy
 
-    Parameters:
-    - question: The main question being asked.
-    - required_keyword (optional): A comma-separated list of keywords that are required for the response.
+#     Parameters:
+#     - question: The main question being asked.
+#     - required_keyword (optional): A comma-separated list of keywords that are required for the response.
 
-    The 'required_keyword' argument is passed as a keyword argument to the downstream function.
-    """
-    print(f"question: {question}")
-    async with ctx.typing():
-        # Splitting the input text into question and additional arguments
-        parts = question.split("--")  # Using '--' as an arbitrary delimiter
-        question = parts[0].strip()
+#     The 'required_keyword' argument is passed as a keyword argument to the downstream function.
+#     """
+#     print(f"question: {question}")
+#     async with ctx.typing():
+#         # Splitting the input text into question and additional arguments
+#         parts = question.split("--")  # Using '--' as an arbitrary delimiter
+#         question = parts[0].strip()
 
-        kwargs = {}
-        if len(parts) > 1:
-            # Assuming additional arguments are formatted as 'key=value'
-            for arg in parts[1:]:
-                key_value = arg.split("=")
-                if len(key_value) == 2 and key_value[0].strip() == "required_keyword":
-                    # Split the values by comma and store them in a list
-                    values = [value.strip() for value in key_value[1].split(",")]
-                    # Store the values as a list under 'required_keyword'
-                    kwargs["required_keyword"] = values
+#         kwargs = {}
+#         if len(parts) > 1:
+#             # Assuming additional arguments are formatted as 'key=value'
+#             for arg in parts[1:]:
+#                 key_value = arg.split("=")
+#                 if len(key_value) == 2 and key_value[0].strip() == "required_keyword":
+#                     # Split the values by comma and store them in a list
+#                     values = [value.strip() for value in key_value[1].split(",")]
+#                     # Store the values as a list under 'required_keyword'
+#                     kwargs["required_keyword"] = values
 
-        # Call ask_async with parsed kwargs
-        response = await ask_async(question, **kwargs)
-        chunks = chunk_strings(response)
+#         # Call ask_async with parsed kwargs
+#         response = await ask_async(question, **kwargs)
+#         chunks = chunk_strings(response)
 
-        for chunk in chunks:
-            await ctx.send(chunk)
+#         for chunk in chunks:
+#             await ctx.send(chunk)
 
 
 async def async_openai_call(messages):
